@@ -50,7 +50,7 @@ def served(url=None):
     return {d['draw']: {'date': d['date'], 'top': d['numbers'][:3], 'confirmed': bool(d.get('confirmed', True))} for d in draws}
 
 
-def changes(before, after):
+def changes(before, after, disputed=()):
     msgs = []
     newest = max(before) if before else 0
     added = sorted(k for k in after if k > newest)
@@ -61,7 +61,10 @@ def changes(before, after):
         if before[k]['confirmed']:
             continue
         if k not in after:
-            msgs.append(dict(before[k], kind='withdrawn', draw=k))
+            m = dict(before[k], kind='withdrawn', draw=k)
+            if disputed and k not in disputed:
+                m['behind'] = min(disputed)  # held back behind an earlier disputed draw
+            msgs.append(m)
         elif before[k]['top'] != after[k]['top']:
             msgs.append(dict(after[k], kind='correction', draw=k, was=before[k]['top']))
     return msgs
@@ -70,8 +73,9 @@ def changes(before, after):
 def message(m):
     top = f"1st {m['top'][0]} · 2nd {m['top'][1]} · 3rd {m['top'][2]}"
     if m['kind'] == 'withdrawn':
-        return (f"4D Draw {m['draw']} results withdrawn",
-                'Two results sources disagree on this draw, so it has been taken down. Check Singapore Pools for the official results.')
+        why = (f"They are held back while draw {m['behind']}, which two results sources disagree on, is checked."
+               if m.get('behind') else 'Two results sources disagree on this draw, so it has been taken down.')
+        return (f"4D Draw {m['draw']} results withdrawn", f'{why} Check Singapore Pools for the official results.')
     if m['kind'] == 'correction':
         return (f"Correction: 4D Draw {m['draw']}",
                 f"{'Confirmed' if m['confirmed'] else 'Corrected'} results: {top}. The results sent earlier were wrong.")
@@ -84,7 +88,11 @@ def message(m):
 def key_for(m):
     """The same draw and result always gets the same key, so a re-run never sends it twice.
     A UUID with version-4 bits, which is what OneSignal asks for, derived from the content."""
-    name = f"heng-ong-huat/{m['kind']}/{m['draw']}/{''.join(m['top'])}"
+    # A 'new' alert also carries the data's update stamp, so a draw withdrawn and then published
+    # again with the same numbers is sent again, while re-runs of the same update are not.
+    name = f"heng-ong-huat/{m['kind']}/{m['draw']}/{''.join(m['top'])}" + ('/confirmed' if m['confirmed'] else '')
+    if m['kind'] == 'new':
+        name += '/' + m.get('stamp', '')
     return str(uuid.UUID(bytes=hashlib.sha256(name.encode()).digest()[:16], version=4))
 
 
@@ -161,7 +169,11 @@ def main():
         pathlib.Path(args[1]).write_text(json.dumps(snap))
     elif args[:1] == ['--diff']:
         before = {int(k): v for k, v in json.loads(pathlib.Path(args[1]).read_text()).items()}
-        msgs = changes(before, published())
+        from update_data import load_disputes  # published() put scripts/ on the path
+        msgs = changes(before, published(), set(load_disputes()['draws']))
+        updated = ROOT / 'data' / 'updated.txt'
+        for m in msgs:
+            m['stamp'] = updated.read_text().strip() if updated.exists() else ''
         for m in msgs:
             print(' / '.join(message(m)))
         if msgs and os.environ.get('GITHUB_OUTPUT'):

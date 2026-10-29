@@ -748,7 +748,7 @@ td { font-size: 0.9375rem; }
         <p class="small muted">A notification on this phone when each draw’s results are in, around 7pm on Wednesday, Saturday and Sunday.</p>
         <p class="small" id="alertsState" role="status"></p>
         <div class="draw-nav" id="alertsActions" hidden><button class="btn" type="button" id="alertsBtn"></button></div>
-        <p class="small muted">Alerts are sent through OneSignal, a notification service. When you turn them on or off, and about once a week while they are on, OneSignal receives this phone’s push address, IP address, device and browser version, language and time zone. It also learns whether alerts are opened. It gets nothing about your numbers or journal.</p>
+        <p class="small muted">Alerts are sent through OneSignal, a notification service. When you turn them on or off, about once a week while they are on, and if this phone’s push address changes, OneSignal receives this phone’s push address, IP address, device and browser version, language and time zone. It also learns whether alerts are opened. It gets nothing about your numbers or journal.</p>
       </div>
 
       <div class="card" id="datesCard">
@@ -2149,13 +2149,16 @@ td { font-size: 0.9375rem; }
   } catch { liveDraws = []; }
   const validDraw = (d) => d && Number.isInteger(d.draw) && /^\d{4}\/\d{2}\/\d{2}$/.test(d.date) && Array.isArray(d.numbers) && d.numbers.length === 23 && d.numbers.every((x) => /^\d{4}$/.test(x));
   const say = (msg) => { toast(msg); announce(msg); };
-  // `draws` is a whole latest.json list, which carries every provisional draw: a confirmed draw
-  // replaces a provisional one, and a provisional draw missing from the list has been withdrawn.
+  // `draws` is a whole latest.json list, which carries the last few archive draws and every
+  // provisional one: a confirmed draw replaces a provisional one, and a provisional draw the list
+  // covers but no longer has has been withdrawn. (A list that starts after it, because this page
+  // is weeks old, says nothing about it.)
   function applyLive(draws, announceNew) {
     const base = buildHistory(BASE_RAW), baseN = base.n;
-    const byNo = new Map(liveDraws.filter((d) => d.confirmed).map((d) => [d.draw, d]));
-    for (const d of draws || []) {
-      if (!validDraw(d) || d.draw <= baseN) continue;
+    const fetched = (draws || []).filter(validDraw), reach = Math.min(...fetched.map((d) => d.draw));
+    const byNo = new Map(liveDraws.filter((d) => d.confirmed || d.draw < reach).map((d) => [d.draw, d]));
+    for (const d of fetched) {
+      if (d.draw <= baseN) continue;
       const had = byNo.get(d.draw);
       if (!had || !had.confirmed || d.confirmed) byNo.set(d.draw, d);
     }
@@ -2167,9 +2170,7 @@ td { font-size: 0.9375rem; }
       if (day < prevDay) break;
       extra.push(d); prevDay = day;
     }
-    const before = H.n, was = new Map(liveDraws.map((d) => [d.draw, d])), now = new Map(extra.map((d) => [d.draw, d]));
-    const corrected = extra.filter((d) => { const w = was.get(d.draw); return w && !w.confirmed && w.numbers.join() !== d.numbers.join(); }).map((d) => ({ was: was.get(d.draw), now: d }));
-    const withdrawn = liveDraws.filter((w) => !w.confirmed && !now.has(w.draw));
+    const before = H.n;
     liveDraws = extra;
     let raw = BASE_RAW, last = base.day[baseN - 1];
     for (const d of extra) {
@@ -2182,22 +2183,21 @@ td { font-size: 0.9375rem; }
     nextH.confirmed = confirmed;
     const changed = nextH.n !== H.n || nextH.confirmed !== H.confirmed || raw !== H.raw;
     nextH.raw = raw;
-    if (!changed) return [];
-    const wasLatest = shownDraw === LAST, restore = keepPlace();
-    H = nextH; LAST = H.n - 1; heatCache = {}; computeBase();
-    renderNextDraw(); renderAbout(); renderHeat(heatFilter); renderJournal(); renderDates();
-    renderDraw(wasLatest ? LAST : Math.min(shownDraw, LAST));
-    const cur = $('#lookupInput').value; if (/^\d{4}$/.test(cur)) lookup(cur);
-    if (R.state === 'complete') { const st = panel.querySelector('.final .story'); if (st) st.outerHTML = storyHTML(R.digits.join(''), false); }
-    restore();
-    const added = extra.filter((d) => d.draw > before);
-    const seen = store.get('seenDraw', 0), fresh = added.filter((d) => d.draw > seen);
-    if (announceNew) {
-      if (fresh.length) announceDraws(fresh);
-      else if (corrected.length) announceCorrection(corrected[corrected.length - 1]);
-      else if (withdrawn.length) say(`Draw ${withdrawn[0].draw} results were taken down: two results sources disagree. Check Singapore Pools for the official results.`);
+    if (changed) {
+      const wasLatest = shownDraw === LAST, restore = keepPlace();
+      H = nextH; LAST = H.n - 1; heatCache = {}; computeBase();
+      renderNextDraw(); renderAbout(); renderHeat(heatFilter); renderJournal(); renderDates();
+      renderDraw(wasLatest ? LAST : Math.min(shownDraw, LAST));
+      const cur = $('#lookupInput').value; if (/^\d{4}$/.test(cur)) lookup(cur);
+      if (R.state === 'complete') { const st = panel.querySelector('.final .story'); if (st) st.outerHTML = storyHTML(R.digits.join(''), false); }
+      restore();
     }
-    store.set('seenDraw', Math.max(seen, H.n));
+    const added = extra.filter((d) => d.draw > before);
+    if (announceNew) {
+      const seen = store.get('seenDraw', 0), fresh = added.filter((d) => d.draw > seen);
+      tell([...reconcile(), ...(fresh.length ? [drawsNews(fresh)] : [])]);
+      store.set('seenDraw', Math.max(seen, H.n));
+    }
     return added;
   }
   // Re-rendering replaces the History and Journal panels: keep the focused control and the
@@ -2224,37 +2224,65 @@ td { font-size: 0.9375rem; }
   // The record only goes up, so a page served from an older cache cannot re-announce a draw.
   const drawRecord = (di) => ({ draw: di + 1, date: isoDay(H.day[di]).replace(/-/g, '/'), numbers: H.drawNumbers(di).map(pad4), confirmed: !isProvisional(di) });
   function catchUp() {
-    const seen = store.get('seenDraw', 0);
+    const seen = store.get('seenDraw', 0), news = reconcile();
     if (seen && H.n > seen) {
       const k = Math.min(H.n - seen, 3);
-      announceDraws(Array.from({ length: k }, (_, i) => drawRecord(H.n - k + i)));
+      news.push(drawsNews(Array.from({ length: k }, (_, i) => drawRecord(H.n - k + i))));
     }
+    tell(news);
     store.set('seenDraw', Math.max(seen, H.n));
+  }
+  // What this phone was shown of each provisional draw, kept across visits, so a correction,
+  // a withdrawal or a draw coming back is told even if it happened while the app was closed.
+  // A record is only compared with data at least as new as the data it was shown from.
+  function reconcile() {
+    const shown = store.get('provShown', {}), out = [];
+    for (const key of Object.keys(shown)) {
+      const k = Number(key), rec = shown[key];
+      if (!rec || !Array.isArray(rec.numbers)) { delete shown[key]; continue; }
+      if (liveStamp && rec.stamp && liveStamp < rec.stamp) continue; // this page's data is older than what was shown
+      if (k > H.n) {
+        if (!rec.gone) { rec.gone = true; out.push({ text: `Draw ${k} results were taken down while they are checked. Check Singapore Pools for the official results.`, journal: false }); }
+        continue;
+      }
+      const d = drawRecord(k - 1);
+      if (rec.gone) out.push(rec.numbers.join() === d.numbers.join() ? drawsNews([d]) : correctionNews(rec, d));
+      else if (rec.numbers.join() !== d.numbers.join()) out.push(correctionNews(rec, d));
+      if (d.confirmed) delete shown[key]; else shown[key] = { numbers: d.numbers, stamp: liveStamp };
+    }
+    for (let di = H.confirmed; di < H.n; di++) if (!shown[di + 1]) shown[di + 1] = { numbers: drawRecord(di).numbers, stamp: liveStamp };
+    store.set('provShown', shown);
+    return out;
+  }
+  // Says up to two pieces of news, those about the user's own journal numbers first.
+  function tell(news) {
+    const top = news.filter(Boolean).sort((a, b) => b.journal - a.journal).slice(0, 2);
+    if (top.length) say(top.map((n) => n.text).join(' '));
   }
   // Journal numbers received before a draw (6.30pm Singapore time on its date)
   const journalBefore = (draw) => { const [y, m, dd] = draw.date.split('/').map(Number), t = Date.UTC(y, m - 1, dd, 10, 30); return journal().filter((e) => e.at < t); };
   const tierAtPos = (k) => TIER[k < 3 ? k + 1 : k < 13 ? 'S' : 'C'];
-  // Tells the user about new results, and whether any number in their journal came up.
-  function announceDraws(added) {
+  // New results, and whether any number in the journal came up.
+  function drawsNews(added) {
     const d = added[added.length - 1];
-    const hits = [];
     for (const a of added) {
       for (const e of journalBefore(a)) {
-        a.numbers.forEach((x, k) => { if (x === e.number) hits.push(`Your number ${e.number} came up: ${tierAtPos(k)} in Draw ${a.draw}${a.confirmed ? '' : ' (provisional)'}.`); });
+        const k = a.numbers.indexOf(e.number);
+        if (k >= 0) return { text: `Your number ${e.number} came up: ${tierAtPos(k)} in Draw ${a.draw}${a.confirmed ? '' : ' (provisional)'}.`, journal: true };
       }
     }
-    say(hits.length ? hits[0] : `Draw ${d.draw} results are in: 1st ${d.numbers[0]}, 2nd ${d.numbers[1]}, 3rd ${d.numbers[2]}.`);
+    return { text: `Draw ${d.draw} results are in: 1st ${d.numbers[0]}, 2nd ${d.numbers[1]}, 3rd ${d.numbers[2]}.`, journal: false };
   }
   // A provisional result was replaced by a different one: say so, and what it means for the
   // journal (a number that came up may no longer be there, or may now be).
-  function announceCorrection({ was: w, now: d }) {
+  function correctionNews(w, d) {
     const head = `Draw ${d.draw} results were corrected`;
     for (const e of journalBefore(d)) {
       const had = w.numbers.indexOf(e.number), has = d.numbers.indexOf(e.number);
-      if (had >= 0 && has < 0) return say(`${head}: your number ${e.number} is not among them after all.`);
-      if (has >= 0 && (had < 0 || tierAtPos(had) !== tierAtPos(has))) return say(`${head}: your number ${e.number} came up, ${tierAtPos(has)}${d.confirmed ? '' : ' (provisional)'}.`);
+      if (had >= 0 && has < 0) return { text: `${head}: your number ${e.number} is not among them after all.`, journal: true };
+      if (has >= 0 && (had < 0 || tierAtPos(had) !== tierAtPos(has))) return { text: `${head}: your number ${e.number} came up, ${tierAtPos(has)}${d.confirmed ? '' : ' (provisional)'}.`, journal: true };
     }
-    say(`${head}: 1st ${d.numbers[0]}, 2nd ${d.numbers[1]}, 3rd ${d.numbers[2]}.`);
+    return { text: `${head}: 1st ${d.numbers[0]}, 2nd ${d.numbers[1]}, 3rd ${d.numbers[2]}.`, journal: false };
   }
   let liveFetchedAt = 0;
   async function fetchLive() {
@@ -2323,6 +2351,9 @@ td { font-size: 0.9375rem; }
       }
       return new Promise((resolve, reject) => { loadFailed.push(reject); within(ready, 'Loading OneSignal').then(resolve, reject); });
     }
+    // This phone's push subscription, held by OneSignal's worker in the push/ scope (not the app's own)
+    const pushSub = () => navigator.serviceWorker.getRegistration(base + 'push/')
+      .then((r) => (r && r.scope.endsWith('/push/') ? r.pushManager.getSubscription() : null)).catch(() => null);
     // Promise form of the permission prompt (older Safari only takes a callback)
     const askPermission = () => new Promise((resolve) => { const r = Notification.requestPermission(resolve); if (r && r.then) r.then(resolve); });
     function render(note) {
@@ -2351,13 +2382,13 @@ td { font-size: 0.9375rem; }
         if ((await asked) !== 'granted') { busy = false; render(); return; }
         const OneSignal = await load();
         // permission is already granted, so this shows no prompt; it creates the push subscription
-        await within(OneSignal.Notifications.requestPermission(), 'Subscribing');
+        if (!(await within(OneSignal.Notifications.requestPermission(), 'Subscribing'))) throw new Error('could not subscribe');
         await within(OneSignal.User.PushSubscription.optIn(), 'Subscribing');
-        // only say "on" once this phone really has a push subscription
-        const sub = OneSignal.User.PushSubscription;
-        for (let i = 0; i < 30 && !(sub.token || sub.id); i++) await new Promise((r) => setTimeout(r, 500));
-        if (!(sub.token || sub.id)) throw new Error('no push subscription');
-        store.set('alerts', true); store.set('alertsSync', Date.now());
+        // only say "on" once this phone really has a push subscription (OneSignal's own fields
+        // can still hold one from before alerts were last turned off)
+        const ps = await pushSub();
+        if (!ps) throw new Error('no push subscription');
+        store.set('alerts', true); store.set('alertsSync', Date.now()); store.set('alertsEndpoint', ps.endpoint);
         busy = false; render('Alerts are on. You’ll get one when the next results are in.');
       } catch {
         busy = false; render('Could not turn alerts on just now. Check your connection and try again.');
@@ -2391,11 +2422,23 @@ td { font-size: 0.9375rem; }
         if (shownOn) turnOff(); else if (supported()) turnOn();
       });
       // the permission may have been changed in the phone's settings meanwhile
-      document.addEventListener('visibilitychange', () => { if (!document.hidden && !busy) render(); });
+      document.addEventListener('visibilitychange', () => { if (!document.hidden && !busy) { render(); keepFresh(); } });
       render();
-      // About once a week while alerts are on, check in with OneSignal so a subscription the
-      // browser dropped is renewed (autoResubscribe). Not on every open: each load reports a session.
-      if (isOn() && Date.now() - store.get('alertsSync', 0) > 7 * DAY) load().then(() => store.set('alertsSync', Date.now())).catch(() => {});
+      keepFresh();
+    }
+    // While alerts are on, check in with OneSignal when this phone's push address is missing or
+    // has changed (e.g. notifications were blocked and allowed again), and otherwise about once
+    // a week, so it can renew the subscription. Not on every open: each load reports a session.
+    function keepFresh() {
+      if (!isOn() || busy) return;
+      pushSub().then((ps) => {
+        const same = ps && ps.endpoint === store.get('alertsEndpoint', '');
+        if (same && Date.now() - store.get('alertsSync', 0) <= 7 * DAY) return null;
+        return load()
+          .then((OneSignal) => (same ? null : within(OneSignal.Notifications.requestPermission(), 'Subscribing')))
+          .then(pushSub)
+          .then((now) => { store.set('alertsSync', Date.now()); store.set('alertsEndpoint', now ? now.endpoint : ''); });
+      }).catch(() => {});
     }
     return { start, render };
   })();

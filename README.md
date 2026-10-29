@@ -74,10 +74,18 @@ Consolation.
 **When the two sources disagree.** If the archive's 1st, 2nd or 3rd prize for a new draw differs
 from the fast feed's, nothing can tell which is right. The draw is held back: it is taken off the
 site, a "results withdrawn" alert goes out, it is listed in `data/disputed.json`, and the workflow
-run fails so the repository owner is emailed. It clears by itself if either source changes to
-agree. If Singapore Pools shows that the archive is right, add the draw number to `use_archive` in
-`data/disputed.json`; the next run publishes it and sends its alert. If the fast feed corrects a
-draw itself, the app shows the new result and a correction alert goes out.
+run fails so the repository owner is emailed. It stays held while the fast feed cannot be read,
+and clears by itself if either source changes to agree. Otherwise check the draw on Singapore
+Pools' site and edit `data/disputed.json`:
+
+- the archive is right: add the draw number to `use_archive`. The next run publishes it as
+  confirmed and sends its alert.
+- the fast feed is right: add it to `use_feed`. Its result goes back up as provisional, new draws
+  keep coming from the fast feed, and the archive waits where it is until it is fixed.
+
+Leave the number there afterwards (the fast feed keeps each draw for about a year). If the file
+does not parse after an edit, the run stops with an error instead of guessing. If the fast feed
+corrects a draw itself, the app shows the new result and a correction alert goes out.
 
 `scripts/update_live.py` takes a same-evening draw only if it follows on from the archive with no gap,
 is not dated in the future, has 23 four-digit numbers, and lists its Starter and Consolation prizes
@@ -115,8 +123,8 @@ How it behaves:
 
 - Alerts are opt-in, from the **Result alerts** card on the History tab. OneSignal's code is loaded only
   after someone turns alerts on. It runs in its own service worker under `push/`, apart from the
-  app's offline cache. When alerts are turned on or off, and about once a week while they are on,
-  OneSignal receives the phone's push address, IP address, device and browser version, language and
+  app's offline cache. When alerts are turned on or off, about once a week while they are on, and
+  when the phone's push address changes, OneSignal receives the phone's push address, IP address, device and browser version, language and
   time zone, and it learns whether alerts are opened. It gets nothing from the journal. Turning
   alerts off also drops the phone's push subscription, so it works offline too.
 - On iPhone and iPad, alerts need iOS 16.4 or later and the app added to the home screen. In a

@@ -10,9 +10,12 @@ Otherwise the old file is kept and a warning is printed, so the site still build
 
 When the two sources disagree on a draw not yet stored, nobody can tell which is right, so the
 draw is recorded in data/disputed.json and held back: update_live.py withdraws it from the site,
-an alert says so, and the workflow run fails so the maintainer hears about it. It clears by itself
-if either source changes to agree. To accept the archive's result instead, add the draw number to
-"use_archive" in data/disputed.json.
+an alert says so, and the workflow run fails so the maintainer hears about it. It stays held while
+the fast feed cannot be read. It clears by itself if either source changes to agree. Otherwise,
+after checking Singapore Pools, add the draw number to "use_archive" (the archive is right) or to
+"use_feed" (the fast feed is right: the archive then stays where it is and new draws keep coming
+from the fast feed, as provisional, until the archive is fixed). Leave the number there: the fast
+feed keeps each draw for about a year.
 
   python3 scripts/update_data.py          refresh (exit 0 even when the source is unusable)
   python3 scripts/update_data.py --last   print the latest draw in the current file
@@ -92,17 +95,27 @@ def parse(text):
 
 
 def load_disputes():
+    """data/disputed.json. A hand edit that does not parse stops the run, rather than silently
+    clearing the disputes and republishing the draws in doubt."""
     try:
         d = json.loads(DISPUTES.read_text())
-        return {'draws': {int(k): v for k, v in d.get('draws', {}).items()}, 'use_archive': [int(x) for x in d.get('use_archive', [])]}
-    except (OSError, ValueError, AttributeError):
-        return {'draws': {}, 'use_archive': []}
+    except FileNotFoundError:
+        return {'draws': {}, 'use_archive': [], 'use_feed': []}
+    except ValueError as e:
+        raise SystemExit(f'::error::data/disputed.json is not valid JSON ({e}); fix the edit')
+    try:
+        return {'draws': {int(k): v for k, v in d.get('draws', {}).items()},
+                'use_archive': [int(x) for x in d.get('use_archive', [])],
+                'use_feed': [int(x) for x in d.get('use_feed', [])]}
+    except (AttributeError, TypeError, ValueError) as e:
+        raise SystemExit(f'::error::data/disputed.json is not in the expected form ({e}); fix the edit')
 
 
 def save_disputes(d):
-    out = {'draws': {str(k): v for k, v in sorted(d['draws'].items())}, 'use_archive': sorted(d['use_archive'])}
-    if not DISPUTES.exists() or json.loads(DISPUTES.read_text() or '{}') != out:
-        DISPUTES.write_text(json.dumps(out, indent=1) + '\n')
+    text = json.dumps({'draws': {str(k): v for k, v in sorted(d['draws'].items())},
+                       'use_archive': sorted(d['use_archive']), 'use_feed': sorted(d['use_feed'])}, indent=1) + '\n'
+    if not DISPUTES.exists() or DISPUTES.read_text() != text:
+        DISPUTES.write_text(text)
 
 
 def stamp():
@@ -111,13 +124,20 @@ def stamp():
 
 
 def crosscheck(draws, stored):
+    disputes = load_disputes()
+    settled = set(disputes['use_archive']) | set(disputes['use_feed'])
     try:
         feed = json.loads(fetch(CROSSCHECK))['fourD']
     except Exception as e:
+        held = sorted(n for n in disputes['draws'] if n > stored and n not in settled)
+        if held:  # without the feed nothing can vouch for a disputed draw: keep holding it
+            raise ValueError(f'cross-check feed unavailable ({e}) while draw {held} is disputed; still held back')
         warn(f'cross-check feed unavailable ({e}); skipping it')
         return
-    disputes = load_disputes()
-    found = {}
+    # a dispute stays open while the feed (or this copy of it) does not list the draw
+    listed = {e.get('draw_no') for e in feed}
+    found = {n: v for n, v in disputes['draws'].items() if n > stored and n not in listed and n not in settled}
+    wrong_archive = []
     checked = 0
     for e in feed:
         n = e.get('draw_no')
@@ -126,10 +146,12 @@ def crosscheck(draws, stored):
         ours = draws[n]['nums'][:3]
         theirs = [e['first'], e['second'], e['third']]
         if ours != theirs:
-            if n <= stored:
-                raise ValueError(f'draw {n}: top three {ours} disagree with the cross-check feed {theirs}')
-            if n in disputes['use_archive']:
+            if n in disputes['use_archive']:  # stays listed while the feed still has the draw (about a year)
                 warn(f"draw {n}: the archive's top three {ours} differ from the fast feed's {theirs}; using the archive, as data/disputed.json says")
+            elif n in disputes['use_feed']:
+                wrong_archive.append(n)
+            elif n <= stored:
+                raise ValueError(f'draw {n}: top three {ours} disagree with the cross-check feed {theirs}')
             else:
                 found[n] = {'archive': ours, 'feed': theirs}
             continue
@@ -140,8 +162,11 @@ def crosscheck(draws, stored):
     save_disputes(disputes)
     if found:
         raise ValueError('the archive and the fast feed disagree on the top three of draw '
-                         + ', '.join(f"{n} (archive {v['archive']}, feed {v['feed']})" for n, v in found.items())
+                         + ', '.join(f"{n} (archive {v['archive']}, feed {v['feed']})" for n, v in sorted(found.items()))
                          + '; held back until they agree (see data/disputed.json)')
+    if wrong_archive:
+        raise ValueError(f"the archive has draw {', '.join(map(str, wrong_archive))} wrong (use_feed in data/disputed.json); "
+                         "keeping the stored results, and the fast feed's draws stay provisional")
     print(f'cross-checked the top three prizes of {checked} draws')
 
 
