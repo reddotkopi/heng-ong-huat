@@ -1,0 +1,45 @@
+name: Watch for tonight's results
+
+on:
+  schedule:
+    # GitHub starts scheduled runs late or drops them, most of all in the evening, so several
+    # starters are spread over the afternoon. The first to run waits for tonight's result (see
+    # scripts/watch_live.py); the others queue behind it and stop at once when it is published.
+    # Times are UTC: add 8 hours for Singapore. They run daily, so special draws are covered;
+    # on other days the run ends within seconds.
+    - cron: '17 5 * * *'    # 1.17pm SGT
+    - cron: '47 6 * * *'    # 2.47pm
+    - cron: '23 8 * * *'    # 4.23pm
+    - cron: '53 9 * * *'    # 5.53pm
+    - cron: '37 10 * * *'   # 6.37pm
+    - cron: '13 11 * * *'   # 7.13pm
+    - cron: '41 11 * * *'   # 7.41pm
+  workflow_dispatch:
+
+permissions:
+  actions: write   # to start the deploy workflow, or a fresh watcher
+  contents: read
+
+concurrency:
+  group: results-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for tonight's result
+        id: watch
+        run: python3 scripts/watch_live.py
+      - name: Publish it
+        if: steps.watch.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy.yml --ref main -f only_if_changed=true
+      - name: Hand over to a fresh run
+        if: steps.watch.outputs.handover == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run watch.yml --ref main

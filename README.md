@@ -38,18 +38,24 @@ The 1st, 2nd and 3rd prizes are cross-checked against a second, independent feed
 ([darrentan90/hobeh-draws](https://github.com/darrentan90/hobeh-draws)). The terms for reusing the
 results have not been confirmed; check them before promoting the app.
 
-4D draws are on Wednesday, Saturday and Sunday at 6.30pm Singapore time. The GitHub Action
-`Update draw results and deploy` checks for results:
+4D draws are on Wednesday, Saturday and Sunday at 6.30pm Singapore time. The second feed usually
+has the result 20 to 30 minutes later; the archive has it the next morning.
 
-- **On draw evenings**, every 10 minutes from 6.45pm to 8.55pm Singapore time, for same-evening
-  results from the faster second feed. These are published as **provisional** and marked so in the app.
-- **The day after**, at 1.20pm and 7.20pm on Thursday, Sunday and Monday, for the confirmed archive.
-  A confirmed draw replaces the provisional one. If any of its top three prizes differ, the app uses
-  the confirmed result and a correction alert goes out.
+- **On draw evenings**, the `Watch for tonight's results` workflow (`watch.yml`) waits for the
+  result in the second feed and, the minute it appears, starts `Update draw results and deploy`
+  (`deploy.yml`), which publishes it as **provisional**, marked so in the app. GitHub starts
+  scheduled runs late and sometimes not at all, especially in the evening, so the watcher has
+  several starters through the afternoon and hands over to a fresh run before GitHub's 6-hour job
+  limit. `deploy.yml` also has three draw-evening runs of its own, as a fallback.
+- **The day after**, at 11.20am and 3.20pm on Thursday, Sunday and Monday, `deploy.yml` checks the
+  confirmed archive. A confirmed draw replaces the provisional one. If any of its top three prizes
+  differ, the app uses the confirmed result and a correction alert goes out.
 
-A scheduled run only redeploys the site when the results changed. GitHub can start scheduled runs a
-few minutes late, and it pauses schedules in a public repository after 60 days without activity (the
-result commits count as activity).
+Scheduled and watcher runs only redeploy the site when the results changed. Both feeds are read at
+their latest commit, because raw.githubusercontent.com can serve a file up to 5 minutes old. GitHub
+disables scheduled workflows in a public repository after 60 days without activity; it is not
+documented whether the automatic result commits count, so if the Actions tab shows a workflow as
+disabled, enable it there.
 
 The app fetches `latest.json` when it opens and every 2 minutes during draw evenings, so new results
 appear without reinstalling. It tells you if a number in your journal came up.
@@ -76,27 +82,38 @@ The app can send a phone notification when each draw's results are in, through
 hidden and the Action sends nothing.
 
 1. Sign up at onesignal.com and create an app. Choose **Web** as the platform and **Custom Code** as
-   the integration.
-2. Set **Site Name** to `Heng Ong Huat` and **Site URL** to `https://reddotkopi.github.io`. Add the icon
-   `https://reddotkopi.github.io/heng-ong-huat/icons/icon-192.png`. Leave the prompts off: the app
-   asks for permission itself, only when someone taps **Turn on alerts**.
-3. Copy the **App ID**. In this repository open **Settings → Secrets and variables → Actions →
+   the integration. (Not "Typical Site": that ignores the app's settings and looks for OneSignal's
+   files at the root of reddotkopi.github.io, where they are not.)
+2. Set **Site Name** to `Heng Ong Huat` and **Site URL** to `https://reddotkopi.github.io` (the origin
+   only, no path). Add the icon `https://reddotkopi.github.io/heng-ong-huat/icons/icon-512.png`.
+   Leave the prompts off: the app asks for permission itself, only when someone taps
+   **Turn on alerts**.
+3. Turn on the **Safari** platform in the same app's web settings. No certificate is needed. Without
+   it, alerts cannot be turned on on iPhone, iPad or Mac Safari.
+4. Copy the **App ID**. In this repository open **Settings → Secrets and variables → Actions →
    Variables**, and add a variable named `ONESIGNAL_APP_ID` with the App ID. It is not secret: it
    ends up in the page.
-4. In OneSignal open **Settings → Keys & IDs** and create an **API key**. In GitHub, on the **Secrets**
-   tab of the same page, add a secret named `ONESIGNAL_REST_API_KEY` with the key. Never put this
-   key anywhere else.
-5. Run the workflow from the **Actions** tab, so the app is rebuilt with alerts.
+5. In OneSignal open **Settings → Keys & IDs** and create an **API key** (it is shown only once).
+   In GitHub, on the **Secrets** tab of the same page, add a secret named `ONESIGNAL_REST_API_KEY`
+   with the key. Never put this key anywhere else.
+6. Run `Update draw results and deploy` from the **Actions** tab, so the app is rebuilt with alerts.
+
+Use this OneSignal app for this site only. All of reddotkopi's GitHub Pages sites share the origin
+`https://reddotkopi.github.io`, and OneSignal allows one app per origin. Alerts go to the `All`
+audience (everyone subscribed); set a repository variable `ONESIGNAL_SEGMENT` to use another segment.
+OneSignal's free plan covers web push to up to 10,000 subscribers per send.
 
 How it behaves:
 
 - Alerts are opt-in, from the **Result alerts** card on the History tab. OneSignal's code is loaded only
   after someone turns alerts on. It runs in its own service worker under `push/`, apart from the
-  app's offline cache. OneSignal gets an anonymous ID for the phone, and nothing from the journal.
+  app's offline cache. OneSignal receives the phone's push address, browser type, language, time
+  zone and IP address, and whether alerts are opened; nothing from the journal.
 - On iPhone and iPad, alerts need iOS 16.4 or later and the app added to the home screen. In a
   Safari tab the card explains this.
 - One alert per new draw: `4D Draw 5555 results (provisional)` with the top three prizes. If the
   confirmed results differ, a correction follows. Re-running a job does not send an alert twice.
+  Tapping an alert opens the app, which shows any results that came in since it was last opened.
 
 ## Publish with GitHub Pages
 
@@ -113,6 +130,7 @@ python3 scripts/build.py            # site/ (the app) and dist/artifact.html (Cl
 python3 -m http.server -d site 8000 # preview at http://localhost:8000
 python3 scripts/update_data.py      # fetch new archive results now
 python3 scripts/update_live.py      # fetch same-evening (provisional) results now
+python3 scripts/watch_live.py       # wait for tonight's result (what watch.yml runs)
 ```
 
 Tests use Playwright with Chromium (`npm i playwright`, then `npx playwright install chromium`):
@@ -129,7 +147,7 @@ ONESIGNAL_APP_ID=12345678-abcd-4ef0-9abc-1234567890ab python3 scripts/build.py &
 | `src/heng-ong-huat.html` | The whole app: markup, styles and script. `__HISTORY_DATA__`, `__LIVE_DATA__` and `__ONESIGNAL_APP_ID__` are filled in at build time. |
 | `data/sp_4d_prizes.csv` | Every winning number: `draw_number,number,date`, in prize order. |
 | `data/live.json` | Same-evening draws not yet in the archive (provisional). |
-| `scripts/` | Build, data encoding, the two result updaters and `notify.py` (result alerts). |
+| `scripts/` | Build, data encoding, the two result updaters, the evening watcher and `notify.py` (result alerts). |
 | `pwa/sw.js` | Offline cache. |
 | `assets/icons/` | App icons. |
 

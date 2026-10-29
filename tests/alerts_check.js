@@ -11,10 +11,15 @@ const server = http.createServer((req, res) => {
   if (!fs.existsSync(f)) { res.writeHead(404); res.end(); return; }
   res.writeHead(200, { 'content-type': types[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(res);
 });
-const STUB = `window.__os = { optedIn: false, inits: [], calls: [] };
-const OneSignal = { init: async (o) => { __os.inits.push(o); }, User: { PushSubscription: {
+// Stub of OneSignal's page SDK: records calls. HANG makes init() never finish, as happens on
+// iPhone when the Safari platform is off in the OneSignal dashboard.
+const stub = (hang) => `window.__os = { optedIn: false, inits: [], calls: [], scripts: (window.__os ? window.__os.scripts : 0) + 1 };
+const OneSignal = { init: async (o) => { if (__os.inits.length) throw new Error('SDK already initialized'); __os.inits.push(o); ${hang ? 'await new Promise(() => {});' : ''} },
+  Notifications: { requestPermission: async () => { __os.calls.push('perm'); return true; }, setDefaultUrl: async (u) => { __os.defaultUrl = u; } },
+  User: { PushSubscription: {
   optIn: async () => { __os.calls.push('in'); __os.optedIn = true; }, optOut: async () => { __os.calls.push('out'); __os.optedIn = false; } } } };
 const q = window.OneSignalDeferred || []; window.OneSignalDeferred = { push: (f) => f(OneSignal) }; q.forEach((f) => f(OneSignal));`;
+const STUB = stub(false);
 const NOTIF = (answer) => `(() => { let perm = localStorage.getItem('perm') || 'default'; Object.defineProperty(Notification, 'permission', { get: () => perm }); Notification.requestPermission = () => { perm = '${answer}'; localStorage.setItem('perm', perm); return Promise.resolve(perm); }; })()`;
 const fails = []; const check = (ok, m) => { if (!ok) fails.push(m); console.log((ok ? 'PASS ' : 'FAIL ') + m); };
 server.listen(0, async () => {
@@ -38,9 +43,10 @@ server.listen(0, async () => {
     check(/Alerts are off/.test(await p.textContent('#alertsState')) && (await p.textContent('#alertsBtn')) === 'Turn on alerts', 'starts off with a Turn on button');
     await p.click('#alertsBtn'); await p.waitForTimeout(400);
     const st = await p.evaluate(() => ({ os: window.__os, stored: localStorage.getItem('hoh:alerts') }));
-    check(sdkLoads === 1 && st.os && st.os.optedIn && st.stored === 'true', 'tap: SDK loaded, subscribed, remembered');
+    check(sdkLoads === 1 && st.os && st.os.optedIn && st.os.calls.join(',') === 'perm,in' && st.stored === 'true', `tap: SDK loaded, subscription created, opted in, remembered (${st.os && st.os.calls})`);
+    check(st.os.defaultUrl === `http://localhost:${server.address().port}/heng-ong-huat/`, `alert taps default to the app (${st.os.defaultUrl})`);
     const init = st.os.inits[0] || {};
-    check(init.appId === '12345678-abcd-4ef0-9abc-1234567890ab' && init.serviceWorkerPath === 'heng-ong-huat/push/OneSignalSDKWorker.js' && init.serviceWorkerParam.scope === '/heng-ong-huat/push/', `init options ${JSON.stringify(init)}`);
+    check(init.appId === '12345678-abcd-4ef0-9abc-1234567890ab' && init.serviceWorkerPath === 'heng-ong-huat/push/OneSignalSDKWorker.js' && init.serviceWorkerParam.scope === '/heng-ong-huat/push/' && init.autoResubscribe === true, `init options ${JSON.stringify(init)}`);
     check(/Alerts are on/.test(await p.textContent('#alertsState')) && (await p.textContent('#alertsBtn')) === 'Turn off alerts', 'shows on, with Turn off');
     await p.locator('#alertsCard').screenshot({ path: path.join(__dirname, 'shots', 'alerts-on.png') });
     // reload: still on, SDK loads to keep the subscription in step
@@ -72,17 +78,37 @@ server.listen(0, async () => {
     check(errs.length === 0, 'no page errors ' + errs.join('|'));
     await ctx.close();
   }
-  // 4. SDK fails to load (offline / blocked)
+  // 4. SDK fails to load (offline / blocked), then loads on the next tap
   {
     const ctx = await b.newContext({ ...devices['Pixel 7'] });
     await ctx.addInitScript(NOTIF('granted'));
-    await ctx.route('https://cdn.onesignal.com/**', (r) => r.abort());
+    let failNext = true;
+    await ctx.route('https://cdn.onesignal.com/**', (r) => { if (failNext) { failNext = false; r.abort(); } else r.fulfill({ contentType: 'text/javascript', body: STUB }); });
     await ctx.route('https://fonts.googleapis.com/**', (r) => r.fulfill({ contentType: 'text/css', body: '' }));
     const p = await ctx.newPage(); const errs = []; p.on('pageerror', (e) => errs.push(e.message));
     await p.goto(url); await p.waitForTimeout(800);
     await p.click('#alertsBtn'); await p.waitForTimeout(800);
-    check(/Could not turn alerts on/.test(await p.textContent('#alertsState')) && await p.isEnabled('#alertsBtn') && await p.evaluate(() => localStorage.getItem('hoh:alerts')) === null, 'SDK unreachable: says so, can retry, not marked on');
+    check(/Could not turn alerts on/.test(await p.textContent('#alertsState')) && await p.isEnabled('#alertsBtn') && await p.evaluate(() => localStorage.getItem('hoh:alerts')) === null, 'SDK unreachable: says so at once, can retry, not marked on');
+    await p.click('#alertsBtn'); await p.waitForTimeout(600);
+    const st = await p.evaluate(() => ({ os: window.__os, stored: localStorage.getItem('hoh:alerts') }));
+    check(st.os && st.os.inits.length === 1 && st.os.optedIn && st.stored === 'true', 'retry after a failed download: one init, alerts on');
     check(errs.length === 0, 'no page errors ' + errs.join('|'));
+    await ctx.close();
+  }
+  // 5. init never finishes (iPhone with the Safari platform off): the button comes back
+  {
+    const ctx = await b.newContext({ ...devices['Pixel 7'] });
+    await ctx.addInitScript(NOTIF('granted'));
+    await ctx.route('https://cdn.onesignal.com/**', (r) => r.fulfill({ contentType: 'text/javascript', body: stub(true) }));
+    await ctx.route('https://fonts.googleapis.com/**', (r) => r.fulfill({ contentType: 'text/css', body: '' }));
+    const p = await ctx.newPage(); const errs = []; p.on('pageerror', (e) => errs.push(e.message));
+    await p.goto(url); await p.waitForTimeout(800);
+    await p.click('#alertsBtn'); await p.waitForTimeout(1000);
+    check(/Turning alerts on/.test(await p.textContent('#alertsState')) && await p.isDisabled('#alertsBtn'), 'while waiting: says so, button disabled');
+    await p.waitForTimeout(20500);
+    check(/Could not turn alerts on/.test(await p.textContent('#alertsState')) && await p.isEnabled('#alertsBtn'), 'init that never finishes: gives up after 20 s');
+    await p.click('#alertsBtn'); await p.waitForTimeout(500);
+    check(await p.evaluate(() => window.__os.inits.length) === 1 && errs.length === 0, 'a second tap does not call init again');
     await ctx.close();
   }
   await b.close(); server.close();

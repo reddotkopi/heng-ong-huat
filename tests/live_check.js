@@ -5,6 +5,7 @@ const { chromium, devices } = require('playwright');
 const http = require('http'), fs = require('fs'), path = require('path');
 const root = path.resolve(__dirname, '..', 'site');
 let latest = JSON.parse(fs.readFileSync(path.join(root, 'latest.json'), 'utf8'));
+const original = latest;
 const nums = ['1234', '5678', '9012', '0767', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999', '0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '7307'];
 const prov = { draw: 5555, date: '2026/10/31', numbers: nums, confirmed: false };
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
@@ -50,6 +51,17 @@ server.listen(0, async () => {
   await p.evaluate(() => window.__HOH.applyLive([{ draw: 5556, date: '2026/11/01', numbers: ['12'], confirmed: false }, { draw: 5558, date: '2026/11/04', numbers: Array(23).fill('0000') }], true));
   check(await p.evaluate(() => window.__HOH.H.n) === before, 'malformed or gapped draws ignored');
   check(errs.length === 0, 'no page errors: ' + errs.join(' | '));
+  // reopening after results came in (already in the page): told once, then not again
+  latest = original; // the site as built: nothing newer to fetch
+  const p2 = await ctx.newPage();
+  await p2.addInitScript(() => { if (!sessionStorage.getItem('x')) { localStorage.setItem('hoh:seenDraw', '5552'); sessionStorage.setItem('x', '1'); } });
+  await p2.goto(url); await p2.waitForTimeout(800);
+  const t1 = await p2.textContent('#toast');
+  check(/Draw 5554 results are in/.test(t1), `results since the last visit announced on open: "${t1}"`);
+  check(await p2.evaluate(() => localStorage.getItem('hoh:seenDraw')) === '5554', 'last seen draw recorded');
+  await p2.evaluate(() => { document.querySelector('#toast').textContent = ''; });
+  await p2.reload(); await p2.waitForTimeout(800);
+  check(!/results are in/.test(await p2.textContent('#toast')), 'not announced again on the next open');
   await b.close(); server.close();
   console.log(fails.length ? `\n${fails.length} FAILED` : '\nALL PASSED'); process.exit(fails.length ? 1 : 0);
 });

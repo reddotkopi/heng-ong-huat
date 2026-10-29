@@ -7,8 +7,10 @@ look cleanly parsed:
   - the Starter and Consolation lists are each in ascending order (the feed sorts them; a
     number out of order means a parsing slip, as happened when a number won two prizes)
   - the draw is not dated in the future (Singapore time)
-The result goes to data/live.json. Once the archive has a draw, it drops out of live.json and
-the archive's version is used, so provisional results are always replaced by confirmed ones.
+The result goes to data/live.json. A draw already published stays until the archive has it,
+even if a stale copy of the feed no longer lists it; if the feed changes a draw's result, the
+new one is used. Once the archive has a draw, it drops out of live.json and the archive's
+version is used, so provisional results are always replaced by confirmed ones.
 
   python3 scripts/update_live.py            refresh data/live.json; prints new draw numbers
   python3 scripts/update_live.py --check F  validate a saved feed file instead of fetching
@@ -62,6 +64,20 @@ def provisional(feed, archive):
     return out
 
 
+def merge(old, fresh, last):
+    byno = {d['draw']: d for d in old if d['draw'] > last}
+    for d in fresh:
+        had = byno.get(d['draw'])
+        if had and had['numbers'] != d['numbers']:
+            warn(f"the fast feed changed its result for draw {d['draw']}; publishing the new one")
+        byno[d['draw']] = d
+    out, n = [], last + 1
+    while n in byno:
+        out.append(byno[n])
+        n += 1
+    return out
+
+
 def main():
     archive = parse(DATA.read_text())
     if '--check' in sys.argv:
@@ -70,11 +86,11 @@ def main():
         return
     old = json.loads(LIVE.read_text()) if LIVE.exists() else {'draws': []}
     try:
-        feed = json.loads(fetch(CROSSCHECK))['fourD']
-        draws = provisional(feed, archive)
+        fresh = provisional(json.loads(fetch(CROSSCHECK))['fourD'], archive)
     except Exception as e:
-        warn(f'fast feed unavailable ({e}); keeping {len(old["draws"])} provisional draws already published')
-        draws = [d for d in old['draws'] if d['draw'] > max(archive)]
+        warn(f'fast feed unavailable ({e}); keeping the provisional draws already published')
+        fresh = []
+    draws = merge(old['draws'], fresh, max(archive))
     # Draws the archive now has are dropped. Flag any provisional result it contradicts.
     for d in old['draws']:
         if d['draw'] in archive and archive[d['draw']]['nums'][:3] != d['numbers'][:3]:

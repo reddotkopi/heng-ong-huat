@@ -11,7 +11,7 @@ Otherwise the old file is kept and a warning is printed, so the site still build
   python3 scripts/update_data.py          refresh (exit 0 even when the source is unusable)
   python3 scripts/update_data.py --last   print the latest draw in the current file
 """
-import csv, datetime, io, json, pathlib, sys, time, urllib.request
+import csv, datetime, io, json, pathlib, re, subprocess, sys, time, urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DATA = ROOT / 'data' / 'sp_4d_prizes.csv'
@@ -25,7 +25,25 @@ def warn(msg):
     print(f'::warning::{msg}')
 
 
+def pinned(url):
+    """The same raw.githubusercontent.com file at the branch's current commit. The CDN caches the
+    branch URL for up to 5 minutes (query strings do not help), but a commit URL is always fresh."""
+    m = re.fullmatch(r'https://raw\.githubusercontent\.com/([^/]+)/([^/]+)/main/(.+)', url)
+    if not m:
+        return url
+    owner, repo, path = m.groups()
+    try:
+        out = subprocess.run(['git', 'ls-remote', f'https://github.com/{owner}/{repo}', 'refs/heads/main'],
+                             capture_output=True, text=True, timeout=30, check=True).stdout.split()
+        if out and re.fullmatch(r'[0-9a-f]{40}', out[0]):
+            return f'https://raw.githubusercontent.com/{owner}/{repo}/{out[0]}/{path}'
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return url
+
+
 def fetch(url, tries=4):
+    url = pinned(url)
     for i in range(tries):
         try:
             with urllib.request.urlopen(url, timeout=30) as r:

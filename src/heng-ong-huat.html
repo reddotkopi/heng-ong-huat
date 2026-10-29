@@ -743,7 +743,7 @@ td { font-size: 0.9375rem; }
         <p class="small muted">A notification on this phone when each draw’s results are in, around 7pm on Wednesday, Saturday and Sunday.</p>
         <p class="small" id="alertsState" role="status"></p>
         <div class="draw-nav" id="alertsActions" hidden><button class="btn" type="button" id="alertsBtn"></button></div>
-        <p class="small muted">Alerts are sent through OneSignal, a notification service. It gets an anonymous ID for this phone, nothing about your numbers or journal.</p>
+        <p class="small muted">Alerts are sent through OneSignal, a notification service. When you turn them on, it receives this phone’s push address, browser type, language, time zone and IP address, and whether alerts are opened. It gets nothing about your numbers or journal.</p>
       </div>
 
       <div class="card" id="datesCard">
@@ -2149,7 +2149,8 @@ td { font-size: 0.9375rem; }
       if (day < prevDay) break;
       extra.push(d); prevDay = day;
     }
-    const before = H.n;
+    const before = H.n, was = new Map(liveDraws.map((d) => [d.draw, d]));
+    const corrected = extra.filter((d) => { const w = was.get(d.draw); return w && !w.confirmed && w.numbers.join() !== d.numbers.join(); });
     liveDraws = extra;
     let raw = BASE_RAW, last = base.day[baseN - 1];
     for (const d of extra) {
@@ -2169,8 +2170,23 @@ td { font-size: 0.9375rem; }
     renderDraw(wasLatest ? LAST : shownDraw);
     const cur = $('#lookupInput').value; if (/^\d{4}$/.test(cur)) lookup(cur);
     const added = extra.filter((d) => d.draw > before);
-    if (announceNew && added.length) announceDraws(added);
+    if (announceNew && added.length) { announceDraws(added); store.set('seenDraw', H.n); }
+    else if (announceNew && corrected.length) {
+      const d = corrected[corrected.length - 1], msg = `Draw ${d.draw} results were corrected: 1st ${d.numbers[0]}, 2nd ${d.numbers[1]}, 3rd ${d.numbers[2]}.`;
+      toast(msg); announce(msg);
+    }
     return added;
+  }
+  // Results that came in since this phone last opened the app (the page may already carry them,
+  // so fetching alone would not notice). Announced once; the first visit just records them.
+  const drawRecord = (di) => ({ draw: di + 1, date: isoDay(H.day[di]).replace(/-/g, '/'), numbers: H.drawNumbers(di).map(pad4), confirmed: !isProvisional(di) });
+  function catchUp() {
+    const seen = store.get('seenDraw', 0);
+    if (seen && H.n > seen) {
+      const k = Math.min(H.n - seen, 3);
+      announceDraws(Array.from({ length: k }, (_, i) => drawRecord(H.n - k + i)));
+    }
+    store.set('seenDraw', H.n);
   }
   // Tells the user about new results, and whether any number in their journal came up.
   function announceDraws(added) {
@@ -2211,36 +2227,46 @@ td { font-size: 0.9375rem; }
     const standalone = () => navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
     const supported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
     const card = $('#alertsCard'), state = $('#alertsState'), btn = $('#alertsBtn'), actions = $('#alertsActions');
-    let sdk = null, busy = false;
+    let busy = false, ready = null, script = null, loadFailed = [];
     const isOn = () => supported() && store.get('alerts', false) && Notification.permission === 'granted';
+    const within = (promise, what) => Promise.race([promise, new Promise((_, no) => setTimeout(() => no(new Error(`${what} took too long`)), 20000))]);
+    // OneSignal can be set up only once per page, so there is one init for the page's life;
+    // only a script that failed to download is tried again.
     function load() {
-      if (sdk) return sdk;
-      sdk = new Promise((resolve, reject) => {
-        const base = location.pathname.replace(/[^/]*$/, '');
-        window.OneSignalDeferred = window.OneSignalDeferred || [];
-        window.OneSignalDeferred.push(async (OneSignal) => {
-          try {
-            await OneSignal.init({
-              appId,
-              serviceWorkerPath: base.slice(1) + 'push/OneSignalSDKWorker.js',
-              serviceWorkerParam: { scope: base + 'push/' },
-              notifyButton: { enable: false },
-              welcomeNotification: { disable: true },
-              promptOptions: { slidedown: { prompts: [] } },
-            });
-            resolve(OneSignal);
-          } catch (e) { reject(e); }
+      const base = location.pathname.replace(/[^/]*$/, '');
+      if (!ready) {
+        ready = new Promise((resolve, reject) => {
+          window.OneSignalDeferred = window.OneSignalDeferred || [];
+          window.OneSignalDeferred.push(async (OneSignal) => {
+            try {
+              await OneSignal.init({
+                appId,
+                serviceWorkerPath: base.slice(1) + 'push/OneSignalSDKWorker.js',
+                serviceWorkerParam: { scope: base + 'push/' },
+                autoResubscribe: true, // creates the subscription once permission is granted, and renews it if the browser drops it
+                persistNotification: false,
+                notifyButton: { enable: false },
+                welcomeNotification: { disable: true },
+                promptOptions: { slidedown: { prompts: [] } },
+              });
+              OneSignal.Notifications.setDefaultUrl(location.origin + base).catch(() => {});
+              resolve(OneSignal);
+            } catch (e) { reject(e); }
+          });
         });
-        const s = document.createElement('script');
-        s.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';
-        s.defer = true;
-        s.onerror = () => reject(new Error('could not load OneSignal'));
-        document.head.appendChild(s);
-        setTimeout(() => reject(new Error('OneSignal took too long')), 20000);
-      });
-      sdk.catch(() => { sdk = null; });
-      return sdk;
+        ready.catch(() => {});
+      }
+      if (!script) {
+        script = document.createElement('script');
+        script.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';
+        script.defer = true;
+        script.onerror = () => { script.remove(); script = null; loadFailed.splice(0).forEach((no) => no(new Error('could not load OneSignal'))); };
+        document.head.appendChild(script);
+      }
+      return new Promise((resolve, reject) => { loadFailed.push(reject); within(ready, 'Loading OneSignal').then(resolve, reject); });
     }
+    // Promise form of the permission prompt (older Safari only takes a callback)
+    const askPermission = () => new Promise((resolve) => { const r = Notification.requestPermission(resolve); if (r && r.then) r.then(resolve); });
     function render(note) {
       const on = isOn();
       actions.hidden = false; btn.disabled = busy;
@@ -2259,13 +2285,15 @@ td { font-size: 0.9375rem; }
       }
     }
     async function turnOn() {
-      // ask first, inside the tap, before anything slow happens
-      const asked = Notification.permission === 'granted' ? Promise.resolve('granted') : Notification.requestPermission();
+      // ask first, inside the tap, before anything slow happens (iPhone requires it)
+      const asked = Notification.permission === 'granted' ? Promise.resolve('granted') : askPermission();
       busy = true; render('Turning alerts on…');
       try {
         if ((await asked) !== 'granted') { busy = false; render(); return; }
         const OneSignal = await load();
-        await OneSignal.User.PushSubscription.optIn();
+        // permission is already granted, so this shows no prompt; it creates the push subscription
+        await within(OneSignal.Notifications.requestPermission(), 'Subscribing');
+        await within(OneSignal.User.PushSubscription.optIn(), 'Subscribing');
         store.set('alerts', true);
         busy = false; render('Alerts are on. You’ll get one when the next results are in.');
       } catch {
@@ -2276,7 +2304,7 @@ td { font-size: 0.9375rem; }
       busy = true; render('Turning alerts off…');
       try {
         const OneSignal = await load();
-        await OneSignal.User.PushSubscription.optOut();
+        await within(OneSignal.User.PushSubscription.optOut(), 'Unsubscribing');
         store.set('alerts', false);
         busy = false; render('Alerts are off.');
       } catch {
@@ -2291,7 +2319,7 @@ td { font-size: 0.9375rem; }
         if (isOn()) turnOff(); else if (supported()) turnOn();
       });
       render();
-      // keep an existing subscription in step (OneSignal resubscribes if the browser dropped it)
+      // keep an existing subscription in step (autoResubscribe renews it if the browser dropped it)
       if (isOn()) load().catch(() => {});
     }
     return { start, render };
@@ -2388,7 +2416,7 @@ td { font-size: 0.9375rem; }
 
   updateTablet(); syncSound(); renderNextDraw(); renderAbout(); setState('intro');
   renderDraw(LAST); renderHeat('all'); renderJournal(); renderNews();
-  applyLive(liveDraws, false); fetchLive(); Alerts.start();
+  applyLive(liveDraws, false); catchUp(); fetchLive(); Alerts.start();
   $('#memDate').value = isoDay(Math.floor((Date.now() + 8 * 3600000 - EPOCH) / DAY)); renderDates();
   lookup(pad4(H.num[H.start[LAST]]));
   if (/[?&]debug=1/.test(location.search)) debugOverlay();

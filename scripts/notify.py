@@ -3,20 +3,23 @@
 The update job notes what is published before refreshing the data, compares afterwards, and
 sends one web push through OneSignal for each change worth knowing about:
   - a new draw (the newest one, when several arrive together), provisional or confirmed
-  - a correction, when the confirmed archive differs from the provisional 1st, 2nd or 3rd prize
+  - a correction, when the 1st, 2nd or 3rd prize of a provisional draw changes (the confirmed
+    archive differs, or the fast feed corrected itself)
 
   python3 scripts/notify.py --snapshot FILE   save the top three prizes of the published draws
   python3 scripts/notify.py --diff FILE       compare with FILE; writes notify=<json> to $GITHUB_OUTPUT
   python3 scripts/notify.py --describe        one line about the published results, for commit messages
   python3 scripts/notify.py --send            send $NOTIFY (from --diff) to subscribers; needs
                                               ONESIGNAL_APP_ID and ONESIGNAL_REST_API_KEY, and does
-                                              nothing without them
+                                              nothing without them. ONESIGNAL_SEGMENT picks who gets
+                                              it (default "All": everyone subscribed)
 """
-import json, os, pathlib, sys, time, urllib.error, urllib.request, uuid
+import hashlib, json, os, pathlib, sys, time, urllib.error, urllib.request, uuid
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SITE_URL = 'https://reddotkopi.github.io/heng-ong-huat/'
-API = 'https://api.onesignal.com/notifications?c=push'
+API = 'https://api.onesignal.com/notifications'
+NO_SUBSCRIBERS = 'All included players are not subscribed'
 KEEP = 10  # recent draws compared between snapshots
 
 
@@ -43,7 +46,7 @@ def changes(before, after):
         k = added[-1]
         msgs.append(dict(after[k], kind='new', draw=k, count=len(added)))
     for k in sorted(set(before) & set(after)):
-        if not before[k]['confirmed'] and after[k]['confirmed'] and before[k]['top'] != after[k]['top']:
+        if not before[k]['confirmed'] and before[k]['top'] != after[k]['top']:
             msgs.append(dict(after[k], kind='correction', draw=k, was=before[k]['top']))
     return msgs
 
@@ -52,11 +55,39 @@ def message(m):
     top = f"1st {m['top'][0]} · 2nd {m['top'][1]} · 3rd {m['top'][2]}"
     if m['kind'] == 'correction':
         return (f"Correction: 4D Draw {m['draw']}",
-                f"Confirmed results: {top}. The provisional ones sent earlier were wrong.")
+                f"{'Confirmed' if m['confirmed'] else 'Corrected'} results: {top}. The results sent earlier were wrong.")
     if m['confirmed']:
         return (f"4D Draw {m['draw']} results", f"{top}. Tap to check your numbers.")
     return (f"4D Draw {m['draw']} results (provisional)",
             f"{top}. Tap to check your numbers, and confirm with Singapore Pools.")
+
+
+def key_for(m):
+    """The same draw and result always gets the same key, so a re-run never sends it twice.
+    A UUID with version-4 bits, which is what OneSignal asks for, derived from the content."""
+    name = f"heng-ong-huat/{m['kind']}/{m['draw']}/{''.join(m['top'])}"
+    return str(uuid.UUID(bytes=hashlib.sha256(name.encode()).digest()[:16], version=4))
+
+
+def post(payload, key):
+    auth = f'Key {key}' if key.startswith('os_v2_') else f'Basic {key}'  # current keys, legacy keys
+    req = urllib.request.Request(API, data=json.dumps(payload).encode(), method='POST',
+                                 headers={'Authorization': auth, 'Content-Type': 'application/json'})
+    for attempt in range(4):
+        wait = 5 * (attempt + 1)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return json.loads(r.read() or b'{}')
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode(errors='replace')[:300]
+            if e.code != 429 and e.code < 500 or attempt == 3:
+                raise RuntimeError(f'HTTP {e.code}: {detail}') from None
+            if (e.headers.get('Retry-After') or '').isdigit():
+                wait = min(int(e.headers['Retry-After']), 120)
+        except OSError as e:
+            if attempt == 3:
+                raise RuntimeError(f'could not reach OneSignal: {e}') from None
+        time.sleep(wait)  # same idempotency key, so a retry cannot send twice
 
 
 def send(msgs):
@@ -64,45 +95,37 @@ def send(msgs):
     if not app_id or not key:
         print('result alerts are not set up (no ONESIGNAL_APP_ID or ONESIGNAL_REST_API_KEY); nothing sent')
         return
-    url = (os.environ.get('SITE_URL') or SITE_URL).rstrip('/') + '/#history'
+    site = (os.environ.get('SITE_URL') or SITE_URL).rstrip('/') + '/'
     failed = 0
     for m in msgs:
         heading, body = message(m)
         payload = {
             'app_id': app_id,
             'target_channel': 'push',
-            'included_segments': ['Total Subscriptions'],
+            'included_segments': [os.environ.get('ONESIGNAL_SEGMENT') or 'All'],
             'headings': {'en': heading},
             'contents': {'en': body},
-            'url': url,
-            # the same draw and result is only ever sent once, even if this job is re-run
-            'idempotency_key': str(uuid.uuid5(uuid.NAMESPACE_URL, f"heng-ong-huat/{m['kind']}/{m['draw']}/{''.join(m['top'])}")),
-            # a correction replaces the alert for the same draw on the phone
-            'web_push_topic': f"draw-{m['draw']}",
+            # the app's start address exactly, so tapping the alert brings an open app to the front
+            'url': site,
+            'chrome_web_icon': site + 'icons/icon-512.png',
+            'idempotency_key': key_for(m),
+            'web_push_topic': f"draw-{m['draw']}",  # a correction replaces the alert for the same draw
             'ttl': 12 * 3600,
         }
-        auth = f'Key {key}' if key.startswith('os_v2_') else f'Basic {key}'
-        req = urllib.request.Request(API, data=json.dumps(payload).encode(), method='POST',
-                                     headers={'Authorization': auth, 'Content-Type': 'application/json'})
-        for attempt in range(3):
-            try:
-                with urllib.request.urlopen(req, timeout=30) as r:
-                    res = json.loads(r.read() or b'{}')
-                print(f"sent {heading!r}: id {res.get('id') or '(none: no subscribers yet)'}")
-                if res.get('errors'):
-                    print(f"::warning::OneSignal reported: {res['errors']}")
-                break
-            except urllib.error.HTTPError as e:
-                detail = e.read().decode(errors='replace')[:300]
-                if e.code < 500 or attempt == 2:
-                    print(f'::error::OneSignal refused {heading!r} (HTTP {e.code}): {detail}')
-                    failed += 1
-                    break
-            except OSError as e:
-                if attempt == 2:
-                    print(f'::error::could not reach OneSignal for {heading!r}: {e}')
-                    failed += 1
-            time.sleep(5 * (attempt + 1))
+        try:
+            res = post(payload, key)
+        except RuntimeError as e:
+            print(f'::error::alert {heading!r} not sent: {e}')
+            failed += 1
+            continue
+        errors = res.get('errors')
+        if res.get('id'):
+            print(f"sent {heading!r}: id {res['id']}" + (f' (some recipients skipped: {errors})' if errors else ''))
+        elif errors == [NO_SUBSCRIBERS]:
+            print(f'{heading!r}: nobody has turned alerts on yet')
+        else:
+            print(f'::error::alert {heading!r} not sent: {res}')
+            failed += 1
     if failed:
         raise SystemExit(1)
 

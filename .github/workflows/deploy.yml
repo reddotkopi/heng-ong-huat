@@ -4,14 +4,21 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      only_if_changed:
+        description: Deploy only if the results changed (used by the evening watcher)
+        type: boolean
+        default: false
   schedule:
-    # 4D draws are Wed, Sat and Sun at 6.30pm Singapore time (10.30am UTC).
-    # Draw evenings: every 10 minutes from 6.45pm to 8.55pm SGT, for same-evening results.
-    - cron: '45,55 10 * * 0,3,6'
-    - cron: '5-55/10 11,12 * * 0,3,6'
-    # The day after, the confirmed archive updates by noon: check at 1.20pm and 7.20pm SGT.
-    - cron: '20 5 * * 0,1,4'
-    - cron: '20 11 * * 0,1,4'
+    # 4D draws are Wed, Sat and Sun at 6.30pm Singapore time (10.30am UTC). Same-evening results
+    # are published by watch.yml, which starts this workflow as soon as they appear. These draw
+    # evening runs are a fallback in case it fails (GitHub may start them late or drop them).
+    - cron: '7 11 * * 0,3,6'    # 7.07pm SGT
+    - cron: '47 11 * * 0,3,6'   # 7.47pm
+    - cron: '33 12 * * 0,3,6'   # 8.33pm
+    # The day after, the confirmed archive usually updates by 10am: check at 11.20am and 3.20pm SGT.
+    - cron: '20 3 * * 0,1,4'
+    - cron: '20 7 * * 0,1,4'
 
 permissions:
   contents: write
@@ -44,7 +51,7 @@ jobs:
         run: |
           if [ -n "$(git status --porcelain -- data/)" ]; then
             git config user.name "github-actions[bot]"
-            git config user.email "41898333+github-actions[bot]@users.noreply.github.com"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add data/
             git commit -m "Update 4D results: $(python3 scripts/notify.py --describe)"
             git pull --rebase origin main
@@ -55,10 +62,11 @@ jobs:
         id: check
         env:
           EVENT: ${{ github.event_name }}
+          ONLY_IF_CHANGED: ${{ inputs.only_if_changed }}
           CHANGED: ${{ steps.save.outputs.changed }}
         run: |
-          # Scheduled runs only redeploy when the results changed.
-          if [ "$EVENT" != schedule ] || [ "$CHANGED" = true ]; then
+          # Scheduled and watcher runs only redeploy when the results changed.
+          if [ "$CHANGED" = true ] || { [ "$EVENT" != schedule ] && [ "$ONLY_IF_CHANGED" != true ]; }; then
             echo "deploy=true" >> "$GITHUB_OUTPUT"
             python3 scripts/notify.py --diff "$RUNNER_TEMP/before.json"
           else
@@ -105,4 +113,5 @@ jobs:
           SITE_URL: ${{ needs.deploy.outputs.page_url }}
           ONESIGNAL_APP_ID: ${{ vars.ONESIGNAL_APP_ID }}
           ONESIGNAL_REST_API_KEY: ${{ secrets.ONESIGNAL_REST_API_KEY }}
+          ONESIGNAL_SEGMENT: ${{ vars.ONESIGNAL_SEGMENT }}
         run: python3 scripts/notify.py --send
