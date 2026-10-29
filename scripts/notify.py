@@ -3,10 +3,9 @@
 The update job notes what the live site shows before refreshing the data (so a deploy that
 failed is retried, alert included, by the next run), compares afterwards, and sends one web push
 through OneSignal for each change worth knowing about:
-  - a new draw (the newest one, when several arrive together), provisional or confirmed
-  - a correction, when the 1st, 2nd or 3rd prize of a provisional draw changes (the confirmed
-    archive differs, or the fast feed corrected itself)
-  - a withdrawal, when a provisional draw is taken down because the two sources disagree
+  - a new draw (up to the three newest, when several arrive together), provisional or confirmed
+  - a correction, when the 1st, 2nd or 3rd prize of a draw changes (the confirmed archive differs
+    from the provisional result, the fast feed corrected itself, or data/corrections.json)
 
   python3 scripts/notify.py --snapshot FILE   save the top three prizes of the draws the live site
                                               shows (its latest.json), or of the repo's data if the
@@ -27,14 +26,16 @@ NO_SUBSCRIBERS = 'All included players are not subscribed'
 KEEP = 10  # recent draws compared between snapshots
 
 
-def published():
-    """{draw: {'date', 'top', 'confirmed'}} for the newest archive draws plus provisional ones."""
+def published(first=None):
+    """{draw: {'date', 'top', 'confirmed'}} for the newest archive draws (from `first`, if that is
+    earlier, so a snapshot's provisional draws are all compared) plus provisional ones."""
     sys.path.insert(0, str(ROOT / 'scripts'))
     from encode_history import read_draws
     archive = read_draws(ROOT / 'data' / 'sp_4d_prizes.csv')
     last = max(archive)
+    lo = max(1, min(last - KEEP + 1, first or last))
     out = {k: {'date': archive[k]['date'], 'top': archive[k]['nums'][:3], 'confirmed': True}
-           for k in range(max(1, last - KEEP + 1), last + 1)}
+           for k in range(lo, last + 1)}
     live = ROOT / 'data' / 'live.json'
     for d in (json.loads(live.read_text())['draws'] if live.exists() else []):
         if d['draw'] > last:
@@ -50,32 +51,19 @@ def served(url=None):
     return {d['draw']: {'date': d['date'], 'top': d['numbers'][:3], 'confirmed': bool(d.get('confirmed', True))} for d in draws}
 
 
-def changes(before, after, disputed=()):
+def changes(before, after):
     msgs = []
     newest = max(before) if before else 0
-    added = sorted(k for k in after if k > newest)
-    if added:
-        k = added[-1]
-        msgs.append(dict(after[k], kind='new', draw=k, count=len(added)))
-    for k in sorted(before):
-        if before[k]['confirmed']:
-            continue
-        if k not in after:
-            m = dict(before[k], kind='withdrawn', draw=k)
-            if disputed and k not in disputed:
-                m['behind'] = min(disputed)  # held back behind an earlier disputed draw
-            msgs.append(m)
-        elif before[k]['top'] != after[k]['top']:
-            msgs.append(dict(after[k], kind='correction', draw=k, was=before[k]['top']))
+    for k in sorted(k for k in after if k > newest)[-3:]:
+        msgs.append(dict(after[k], kind='new', draw=k))
+    fixed = [k for k in sorted(set(before) & set(after)) if before[k]['top'] != after[k]['top']]
+    for k in fixed[-3:]:
+        msgs.append(dict(after[k], kind='correction', draw=k, was=before[k]['top']))
     return msgs
 
 
 def message(m):
     top = f"1st {m['top'][0]} · 2nd {m['top'][1]} · 3rd {m['top'][2]}"
-    if m['kind'] == 'withdrawn':
-        why = (f"They are held back while draw {m['behind']}, which two results sources disagree on, is checked."
-               if m.get('behind') else 'Two results sources disagree on this draw, so it has been taken down.')
-        return (f"4D Draw {m['draw']} results withdrawn", f'{why} Check Singapore Pools for the official results.')
     if m['kind'] == 'correction':
         return (f"Correction: 4D Draw {m['draw']}",
                 f"{'Confirmed' if m['confirmed'] else 'Corrected'} results: {top}. The results sent earlier were wrong.")
@@ -88,8 +76,8 @@ def message(m):
 def key_for(m):
     """The same draw and result always gets the same key, so a re-run never sends it twice.
     A UUID with version-4 bits, which is what OneSignal asks for, derived from the content."""
-    # A 'new' alert also carries the data's update stamp, so a draw withdrawn and then published
-    # again with the same numbers is sent again, while re-runs of the same update are not.
+    # A 'new' alert also carries the data's update stamp: re-runs of the same update are not sent
+    # twice, but a later update that publishes the draw again (say, after it was missing) is.
     name = f"heng-ong-huat/{m['kind']}/{m['draw']}/{''.join(m['top'])}" + ('/confirmed' if m['confirmed'] else '')
     if m['kind'] == 'new':
         name += '/' + m.get('stamp', '')
@@ -169,8 +157,7 @@ def main():
         pathlib.Path(args[1]).write_text(json.dumps(snap))
     elif args[:1] == ['--diff']:
         before = {int(k): v for k, v in json.loads(pathlib.Path(args[1]).read_text()).items()}
-        from update_data import load_disputes  # published() put scripts/ on the path
-        msgs = changes(before, published(), set(load_disputes()['draws']))
+        msgs = changes(before, published(min(before) if before else None))
         updated = ROOT / 'data' / 'updated.txt'
         for m in msgs:
             m['stamp'] = updated.read_text().strip() if updated.exists() else ''

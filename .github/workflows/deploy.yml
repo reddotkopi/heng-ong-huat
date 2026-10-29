@@ -37,7 +37,7 @@ jobs:
     outputs:
       deploy: ${{ steps.check.outputs.deploy }}
       notify: ${{ steps.check.outputs.notify }}
-      disputed: ${{ steps.check.outputs.disputed }}
+      disagree: ${{ steps.archive.outputs.disagree }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,6 +48,7 @@ jobs:
       - name: Note what the live site shows
         run: python3 scripts/notify.py --snapshot "$RUNNER_TEMP/before.json"
       - name: Refresh confirmed results
+        id: archive
         run: python3 scripts/update_data.py
       - name: Refresh same-evening results (provisional)
         run: python3 scripts/update_live.py
@@ -79,9 +80,6 @@ jobs:
             python3 scripts/notify.py --diff "$RUNNER_TEMP/before.json"
           else
             echo "the live site is up to date"
-          fi
-          if [ -n "$(python3 scripts/update_data.py --disputed)" ]; then
-            echo "disputed=true" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.check.outputs.deploy == 'true'
         uses: actions/configure-pages@v5
@@ -122,13 +120,15 @@ jobs:
           ONESIGNAL_SEGMENT: ${{ vars.ONESIGNAL_SEGMENT }}
         run: python3 scripts/notify.py --send
 
-  # The archive and the fast feed disagree on a draw: it is withdrawn from the site until they
-  # agree. Fail the run so the repository owner is emailed (see data/disputed.json and README).
-  disputed:
+  # The archive and the fast feed disagreed on a new draw's top three prizes. The archive's result
+  # is published (it is the confirmed source); fail the run so the owner is emailed to check it.
+  disagree:
     needs: [build, deploy, notify]
-    if: always() && needs.build.outputs.disputed == 'true'
+    if: always() && needs.build.outputs.disagree != ''
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          echo "::error::The two results sources disagree on the top three prizes of a draw, so it is held back. See data/disputed.json and the README."
+      - env:
+          DRAWS: ${{ needs.build.outputs.disagree }}
+        run: |
+          echo "::error::The archive and the fast feed disagree on the top three prizes of draw $DRAWS. The archive's result is published. Check it on Singapore Pools; if it is wrong, put the right numbers in data/corrections.json (see README)."
           exit 1

@@ -5,7 +5,7 @@ Format: draws joined by ';' in draw-number order (draw n is index n-1). Each dra
 Draw 1's day delta counts from 31 May 1986 (so it is 0). Numbers keep the source order:
 1st, 2nd, 3rd, then the Starter prizes, then the Consolation prizes.
 """
-import collections, csv, datetime, json, sys
+import collections, csv, datetime, json, pathlib, sys
 
 EPOCH = datetime.date(1986, 5, 31)
 
@@ -20,7 +20,26 @@ def read_draws(path):
             if not (len(r['number']) == 4 and r['number'].isdigit()):
                 raise ValueError(f"draw {r['draw_number']} has a bad number {r['number']!r}")
             d['nums'].append(r['number'])
+    apply_corrections(draws, pathlib.Path(path).with_name('corrections.json'))
     return draws
+
+
+def apply_corrections(draws, path):
+    """data/corrections.json, if present, overrides the archive's 1st, 2nd and 3rd prizes of a draw
+    found to be wrong (checked against Singapore Pools), for example
+        {"5555": {"top": ["1234", "5678", "9012"], "note": "1st and 2nd were swapped"}}
+    """
+    if not path.exists():
+        return
+    try:
+        fixes = json.loads(path.read_text())
+        for k, v in fixes.items():
+            n, top = int(k), v['top']
+            if n not in draws or len(top) != 3 or not all(isinstance(x, str) and len(x) == 4 and x.isdigit() for x in top):
+                raise ValueError(f'draw {k}: needs a stored draw and three four-digit numbers')
+            draws[n]['nums'][:3] = top
+    except (ValueError, KeyError, TypeError, AttributeError) as e:
+        raise SystemExit(f'::error::data/corrections.json is not valid ({e}); fix the edit')
 
 
 def encode(path):

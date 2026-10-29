@@ -65,27 +65,19 @@ appear without reinstalling. It tells you if a number in your journal came up.
 - every number is four digits, the draw numbers run without gaps, and the dates never go backwards
 - every draw since 6 April 1991 has 23 numbers
 - it keeps every stored draw unchanged and adds to the end
-- its top three prizes agree with the second feed
 
 Otherwise it keeps the stored results and logs a warning. Draws before 6 April 1991 were tied to horse
 races, so 210 of them have 17 to 27 winning numbers, and their records do not separate Starter from
 Consolation.
 
-**When the two sources disagree.** If the archive's 1st, 2nd or 3rd prize for a new draw differs
-from the fast feed's, nothing can tell which is right. The draw is held back: it is taken off the
-site, a "results withdrawn" alert goes out, it is listed in `data/disputed.json`, and the workflow
-run fails so the repository owner is emailed. It stays held while the fast feed cannot be read,
-and clears by itself if either source changes to agree. Otherwise check the draw on Singapore
-Pools' site and edit `data/disputed.json`:
-
-- the archive is right: add the draw number to `use_archive`. The next run publishes it as
-  confirmed and sends its alert.
-- the fast feed is right: add it to `use_feed`. Its result goes back up as provisional, new draws
-  keep coming from the fast feed, and the archive waits where it is until it is fixed.
-
-Leave the number there afterwards (the fast feed keeps each draw for about a year). If the file
-does not parse after an edit, the run stops with an error instead of guessing. If the fast feed
-corrects a draw itself, the app shows the new result and a correction alert goes out.
+**When the two sources disagree.** The archive is the confirmed source. If its 1st, 2nd or 3rd
+prize for a new draw differs from the fast feed's, the archive's result is published, the app and a
+correction alert put right the provisional result shown that evening, and the workflow run is
+marked failed so the repository owner is emailed. Check the draw on Singapore Pools' site. If the
+archive turns out to be wrong, add the right top three to `data/corrections.json`, for example
+`{"5555": {"top": ["1234", "5678", "9012"], "note": "1st and 2nd were swapped"}}`. Every published
+result then uses them, and a correction alert goes out. If the fast feed corrects a provisional
+draw itself, the app shows the new result and a correction alert goes out.
 
 `scripts/update_live.py` takes a same-evening draw only if it follows on from the archive with no gap,
 is not dated in the future, has 23 four-digit numbers, and lists its Starter and Consolation prizes
@@ -124,8 +116,9 @@ How it behaves:
 - Alerts are opt-in, from the **Result alerts** card on the History tab. OneSignal's code is loaded only
   after someone turns alerts on. It runs in its own service worker under `push/`, apart from the
   app's offline cache. When alerts are turned on or off, about once a week while they are on, and
-  when the phone's push address changes, OneSignal receives the phone's push address, IP address, device and browser version, language and
-  time zone, and it learns whether alerts are opened. It gets nothing from the journal. Turning
+  when the phone's push address changes, OneSignal receives the phone's push address, IP address,
+  device and browser version, language and time zone, and for the rest of that visit, when the app
+  is in use. It also learns whether alerts are opened. It gets nothing from the journal. Turning
   alerts off also drops the phone's push subscription, so it works offline too.
 - On iPhone and iPad, alerts need iOS 16.4 or later and the app added to the home screen. In a
   Safari tab the card explains this.

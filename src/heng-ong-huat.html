@@ -748,7 +748,7 @@ td { font-size: 0.9375rem; }
         <p class="small muted">A notification on this phone when each draw’s results are in, around 7pm on Wednesday, Saturday and Sunday.</p>
         <p class="small" id="alertsState" role="status"></p>
         <div class="draw-nav" id="alertsActions" hidden><button class="btn" type="button" id="alertsBtn"></button></div>
-        <p class="small muted">Alerts are sent through OneSignal, a notification service. When you turn them on or off, about once a week while they are on, and if this phone’s push address changes, OneSignal receives this phone’s push address, IP address, device and browser version, language and time zone. It also learns whether alerts are opened. It gets nothing about your numbers or journal.</p>
+        <p class="small muted">Alerts are sent through OneSignal, a notification service. When you turn them on or off, about once a week while they are on, and if this phone’s push address changes, OneSignal receives this phone’s push address, IP address, device and browser version, language and time zone, and for the rest of that visit, when the app is in use. It also learns whether alerts are opened. It gets nothing about your numbers or journal.</p>
       </div>
 
       <div class="card" id="datesCard">
@@ -932,10 +932,10 @@ td { font-size: 0.9375rem; }
     };
   }
   let H = buildHistory(BASE_RAW);
-  H.confirmed = H.n; H.raw = BASE_RAW;
+  H.prov = new Set(); H.raw = BASE_RAW; // H.prov: indexes of provisional draws
   const pad4 = (v) => String(v).padStart(4, '0');
   let LAST = H.n - 1;
-  const isProvisional = (di) => di >= H.confirmed;
+  const isProvisional = (di) => H.prov.has(di);
 
   function permutations(s) {
     const out = new Set();
@@ -1194,7 +1194,7 @@ td { font-size: 0.9375rem; }
   function announce(msg) { const l = $('#live'); l.textContent = ''; setTimeout(() => { l.textContent = msg; }, 30); }
   function toast(msg) {
     const t = $('#toast'); t.textContent = msg; t.hidden = false;
-    clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 2600);
+    clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, Math.min(9000, 2600 + Math.max(0, msg.length - 60) * 45));
   }
 
   /* ---------------- Ritual state ---------------- */
@@ -2178,10 +2178,8 @@ td { font-size: 0.9375rem; }
       raw += `;${day - last},${d.numbers.join('')}`; last = day;
     }
     const nextH = buildHistory(raw);
-    let confirmed = baseN;
-    for (const d of extra) { if (d.confirmed) confirmed++; else break; }
-    nextH.confirmed = confirmed;
-    const changed = nextH.n !== H.n || nextH.confirmed !== H.confirmed || raw !== H.raw;
+    nextH.prov = new Set(extra.flatMap((d, i) => (d.confirmed ? [] : [baseN + i])));
+    const changed = nextH.n !== H.n || [...nextH.prov].join() !== [...H.prov].join() || raw !== H.raw;
     nextH.raw = raw;
     if (changed) {
       const wasLatest = shownDraw === LAST, restore = keepPlace();
@@ -2195,7 +2193,7 @@ td { font-size: 0.9375rem; }
     const added = extra.filter((d) => d.draw > before);
     if (announceNew) {
       const seen = store.get('seenDraw', 0), fresh = added.filter((d) => d.draw > seen);
-      tell([...reconcile(), ...(fresh.length ? [drawsNews(fresh)] : [])]);
+      tell([...reconcile(reach), ...(fresh.length ? [drawsNews(fresh, 1)] : [])]);
       store.set('seenDraw', Math.max(seen, H.n));
     }
     return added;
@@ -2224,54 +2222,60 @@ td { font-size: 0.9375rem; }
   // The record only goes up, so a page served from an older cache cannot re-announce a draw.
   const drawRecord = (di) => ({ draw: di + 1, date: isoDay(H.day[di]).replace(/-/g, '/'), numbers: H.drawNumbers(di).map(pad4), confirmed: !isProvisional(di) });
   function catchUp() {
-    const seen = store.get('seenDraw', 0), news = reconcile();
+    const seen = store.get('seenDraw', 0), news = reconcile(0);
     if (seen && H.n > seen) {
       const k = Math.min(H.n - seen, 3);
-      news.push(drawsNews(Array.from({ length: k }, (_, i) => drawRecord(H.n - k + i))));
+      news.push(drawsNews(Array.from({ length: k }, (_, i) => drawRecord(H.n - k + i)), 1));
     }
     tell(news);
     store.set('seenDraw', Math.max(seen, H.n));
   }
   // What this phone was shown of each provisional draw, kept across visits, so a correction,
   // a withdrawal or a draw coming back is told even if it happened while the app was closed.
-  // A record is only compared with data at least as new as the data it was shown from.
-  function reconcile() {
-    const shown = store.get('provShown', {}), out = [];
+  // A record is only compared with data at least as new as the data it was shown from (pages
+  // served from an older cache are skipped), a draw is only taken as gone when the data reaches
+  // it (`reach`), and once a draw is confirmed it is never recorded again. Kept in memory too,
+  // for phones that block site storage.
+  let provMem = {};
+  function reconcile(reach) {
+    const shown = store.get('provShown', null) || provMem, done = store.get('provDone', 0), out = [];
     for (const key of Object.keys(shown)) {
       const k = Number(key), rec = shown[key];
       if (!rec || !Array.isArray(rec.numbers)) { delete shown[key]; continue; }
-      if (liveStamp && rec.stamp && liveStamp < rec.stamp) continue; // this page's data is older than what was shown
+      if (rec.stamp && (!liveStamp || liveStamp < rec.stamp)) continue;
       if (k > H.n) {
-        if (!rec.gone) { rec.gone = true; out.push({ text: `Draw ${k} results were taken down while they are checked. Check Singapore Pools for the official results.`, journal: false }); }
+        if (!rec.gone && k >= reach) { rec.gone = true; rec.stamp = liveStamp; out.push({ text: `Draw ${k} results were taken down while they are checked. Check Singapore Pools for the official results.`, prio: 2 }); }
         continue;
       }
       const d = drawRecord(k - 1);
-      if (rec.gone) out.push(rec.numbers.join() === d.numbers.join() ? drawsNews([d]) : correctionNews(rec, d));
+      if (rec.gone) out.push(rec.numbers.join() === d.numbers.join() ? drawsNews([d], 2) : correctionNews(rec, d));
       else if (rec.numbers.join() !== d.numbers.join()) out.push(correctionNews(rec, d));
-      if (d.confirmed) delete shown[key]; else shown[key] = { numbers: d.numbers, stamp: liveStamp };
+      if (d.confirmed) { delete shown[key]; store.set('provDone', Math.max(store.get('provDone', 0), k)); }
+      else shown[key] = { numbers: d.numbers, stamp: liveStamp };
     }
-    for (let di = H.confirmed; di < H.n; di++) if (!shown[di + 1]) shown[di + 1] = { numbers: drawRecord(di).numbers, stamp: liveStamp };
-    store.set('provShown', shown);
+    for (const di of H.prov) if (!shown[di + 1] && di + 1 > done) shown[di + 1] = { numbers: drawRecord(di).numbers, stamp: liveStamp };
+    provMem = shown; store.set('provShown', shown);
     return out;
   }
-  // Says up to two pieces of news, those about the user's own journal numbers first.
+  // Says the most important news (the user's own journal numbers first, then new draws), up to two.
   function tell(news) {
-    const top = news.filter(Boolean).sort((a, b) => b.journal - a.journal).slice(0, 2);
+    const top = news.filter(Boolean).sort((a, b) => a.prio - b.prio).slice(0, 2);
     if (top.length) say(top.map((n) => n.text).join(' '));
   }
   // Journal numbers received before a draw (6.30pm Singapore time on its date)
   const journalBefore = (draw) => { const [y, m, dd] = draw.date.split('/').map(Number), t = Date.UTC(y, m - 1, dd, 10, 30); return journal().filter((e) => e.at < t); };
   const tierAtPos = (k) => TIER[k < 3 ? k + 1 : k < 13 ? 'S' : 'C'];
-  // New results, and whether any number in the journal came up.
-  function drawsNews(added) {
+  // New results, and whether any number in the journal came up. prio: 1 for new draws, 2 for a
+  // draw coming back; news about a journal number always comes first (0).
+  function drawsNews(added, prio) {
     const d = added[added.length - 1];
     for (const a of added) {
       for (const e of journalBefore(a)) {
         const k = a.numbers.indexOf(e.number);
-        if (k >= 0) return { text: `Your number ${e.number} came up: ${tierAtPos(k)} in Draw ${a.draw}${a.confirmed ? '' : ' (provisional)'}.`, journal: true };
+        if (k >= 0) return { text: `Your number ${e.number} came up: ${tierAtPos(k)} in Draw ${a.draw}${a.confirmed ? '' : ' (provisional)'}.`, prio: 0 };
       }
     }
-    return { text: `Draw ${d.draw} results are in: 1st ${d.numbers[0]}, 2nd ${d.numbers[1]}, 3rd ${d.numbers[2]}.`, journal: false };
+    return { text: `Draw ${d.draw} results are in: 1st ${d.numbers[0]}, 2nd ${d.numbers[1]}, 3rd ${d.numbers[2]}.`, prio };
   }
   // A provisional result was replaced by a different one: say so, and what it means for the
   // journal (a number that came up may no longer be there, or may now be).
@@ -2279,10 +2283,11 @@ td { font-size: 0.9375rem; }
     const head = `Draw ${d.draw} results were corrected`;
     for (const e of journalBefore(d)) {
       const had = w.numbers.indexOf(e.number), has = d.numbers.indexOf(e.number);
-      if (had >= 0 && has < 0) return { text: `${head}: your number ${e.number} is not among them after all.`, journal: true };
-      if (has >= 0 && (had < 0 || tierAtPos(had) !== tierAtPos(has))) return { text: `${head}: your number ${e.number} came up, ${tierAtPos(has)}${d.confirmed ? '' : ' (provisional)'}.`, journal: true };
+      if (had >= 0 && has < 0) return { text: `${head}: your number ${e.number} is not among them after all.`, prio: 0 };
+      if (has >= 0 && (had < 0 || tierAtPos(had) !== tierAtPos(has))) return { text: `${head}: your number ${e.number} came up, ${tierAtPos(has)}${d.confirmed ? '' : ' (provisional)'}.`, prio: 0 };
     }
-    return { text: `${head}: 1st ${d.numbers[0]}, 2nd ${d.numbers[1]}, 3rd ${d.numbers[2]}.`, journal: false };
+    if (w.numbers.slice(0, 3).join() === d.numbers.slice(0, 3).join()) return { text: `${head}: some Starter or Consolation prizes changed.`, prio: 2 };
+    return { text: `${head}: 1st ${d.numbers[0]}, 2nd ${d.numbers[1]}, 3rd ${d.numbers[2]}.`, prio: 2 };
   }
   let liveFetchedAt = 0;
   async function fetchLive() {
@@ -2314,7 +2319,7 @@ td { font-size: 0.9375rem; }
     const supported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
     const card = $('#alertsCard'), state = $('#alertsState'), btn = $('#alertsBtn'), actions = $('#alertsActions');
     const base = location.pathname.replace(/[^/]*$/, '');
-    let busy = false, shownOn = false, ready = null, script = null, loadFailed = [];
+    let busy = false, shownOn = false, offAsked = false, ready = null, script = null, loadFailed = [];
     const isOn = () => supported() && store.get('alerts', false) && Notification.permission === 'granted';
     const within = (promise, what) => Promise.race([promise, new Promise((_, no) => setTimeout(() => no(new Error(`${what} took too long`)), 20000))]);
     // OneSignal can be set up only once per page, so there is one init for the page's life;
@@ -2336,6 +2341,11 @@ td { font-size: 0.9375rem; }
                 promptOptions: { slidedown: { prompts: [] } },
               });
               OneSignal.Notifications.setDefaultUrl(location.origin + base).catch(() => {});
+              // alerts were turned off while OneSignal was still loading: undo what init renewed
+              if (offAsked) {
+                OneSignal.User.PushSubscription.optOut().catch(() => {});
+                pushSub().then((ps) => ps && ps.unsubscribe()).catch(() => {});
+              }
               resolve(OneSignal);
             } catch (e) { reject(e); }
           });
@@ -2377,7 +2387,7 @@ td { font-size: 0.9375rem; }
     async function turnOn() {
       // ask first, inside the tap, before anything slow happens (iPhone requires it)
       const asked = Notification.permission === 'granted' ? Promise.resolve('granted') : askPermission();
-      busy = true; render('Turning alerts on…');
+      busy = true; offAsked = false; render('Turning alerts on…');
       try {
         if ((await asked) !== 'granted') { busy = false; render(); return; }
         const OneSignal = await load();
@@ -2397,7 +2407,7 @@ td { font-size: 0.9375rem; }
     // Tells OneSignal, and also drops this phone's push subscription itself, which works offline
     // and stops alerts arriving even if OneSignal never hears about it.
     async function turnOff() {
-      busy = true; render('Turning alerts off…');
+      busy = true; offAsked = true; render('Turning alerts off…');
       let told = false, dropped = false;
       try {
         const OneSignal = await load();

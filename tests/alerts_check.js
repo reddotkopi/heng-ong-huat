@@ -135,6 +135,22 @@ server.listen(0, async () => {
     check(errs.length === 0, 'no page errors ' + errs.join('|'));
     await ctx.close();
   }
+  // 7. turned off while OneSignal is still loading: when it does arrive, the opt-out is sent
+  {
+    const ctx = await b.newContext({ ...devices['Pixel 7'] });
+    await ctx.addInitScript(() => { localStorage.setItem('hoh:alerts', 'true'); localStorage.setItem('hoh:alertsSync', String(Date.now())); localStorage.setItem('perm', 'granted'); localStorage.setItem('fakeSub', 'https://push.example/abc'); localStorage.setItem('hoh:alertsEndpoint', '"https://push.example/abc"'); });
+    await ctx.addInitScript(NOTIF('granted'));
+    await ctx.route('https://cdn.onesignal.com/**', async (r) => { await new Promise((res) => setTimeout(res, 22000)); r.fulfill({ contentType: 'text/javascript', body: STUB }).catch(() => {}); });
+    await ctx.route('https://fonts.googleapis.com/**', (r) => r.fulfill({ contentType: 'text/css', body: '' }));
+    const p = await ctx.newPage(); const errs = []; p.on('pageerror', (e) => errs.push(e.message));
+    await p.goto(url); await p.waitForTimeout(800);
+    await p.click('#alertsBtn'); await p.waitForTimeout(21000);
+    check(/Alerts are off/.test(await p.textContent('#alertsState')), 'slow OneSignal: off on the phone after the wait');
+    await p.waitForTimeout(3000);
+    check(await p.evaluate(() => window.__os && window.__os.calls.includes('out')), 'when OneSignal arrives late, the opt-out is still sent');
+    check(errs.length === 0, 'no page errors ' + errs.join('|'));
+    await ctx.close();
+  }
   // 5. init never finishes (iPhone with the Safari platform off): the button comes back
   {
     const ctx = await b.newContext({ ...devices['Pixel 7'] });

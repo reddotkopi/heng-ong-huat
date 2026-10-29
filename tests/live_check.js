@@ -36,7 +36,7 @@ server.listen(0, async () => {
   // force a fetch (the visibility handler waits 10 minutes between fetches outside draw evenings)
   await p.evaluate(async () => { const r = await fetch('latest.json?t=' + Date.now()); window.__HOH.applyLive((await r.json()).draws, true); });
   await p.waitForTimeout(400);
-  const st = await p.evaluate(() => ({ n: window.__HOH.H.n, conf: window.__HOH.H.confirmed, toast: document.querySelector('#toast').textContent, next: document.querySelector('#nextDraw').textContent }));
+  const st = await p.evaluate(() => ({ n: window.__HOH.H.n, conf: window.__HOH.H.n - window.__HOH.H.prov.size, toast: document.querySelector('#toast').textContent, next: document.querySelector('#nextDraw').textContent }));
   check(st.n === 5555 && st.conf === 5554, `provisional draw appended (n ${st.n}, confirmed ${st.conf})`);
   check(/Your number 7307 came up: Consolation in Draw 5555 \(provisional\)/.test(st.toast), `journal holder told their number came up: "${st.toast}"`);
   check(/provisional/.test(st.next), `header says provisional: "${st.next}"`);
@@ -52,7 +52,7 @@ server.listen(0, async () => {
   await p.evaluate((d) => window.__HOH.applyLive([d], true), conf);
   const t3 = await p.textContent('#toast');
   check(/Draw 5555 results were corrected: your number 7307 is not among them after all/.test(t3), `correction tells the journal holder: "${t3}"`);
-  const st2 = await p.evaluate(() => ({ n: window.__HOH.H.n, conf: window.__HOH.H.confirmed, has: window.__HOH.numberStats('7307').occ.length, has2: window.__HOH.numberStats('7308').occ.length }));
+  const st2 = await p.evaluate(() => ({ n: window.__HOH.H.n, conf: window.__HOH.H.n - window.__HOH.H.prov.size, has: window.__HOH.numberStats('7307').occ.length, has2: window.__HOH.numberStats('7308').occ.length }));
   check(st2.n === 5555 && st2.conf === 5555, `confirmed draw replaces provisional (confirmed ${st2.conf})`);
   check(st2.has2 > 0, 'confirmed numbers used after replacement');
   // bad data is ignored
@@ -63,6 +63,8 @@ server.listen(0, async () => {
   // a provisional draw that disappears from latest.json has been withdrawn (sources disagree)
   {
     const p3 = await ctx.newPage();
+    // a fresh phone's record (in this context draw 5555 was already confirmed above)
+    await p3.addInitScript(() => { localStorage.removeItem('hoh:provDone'); localStorage.removeItem('hoh:provShown'); });
     latest = { ...original, updated: '2026-10-31T11:00:00Z', draws: [...original.draws, prov] };
     await p3.goto(url); await p3.waitForTimeout(1000);
     check(await p3.evaluate(() => window.__HOH.H.n) === 5555, 'provisional 5555 shown');
@@ -132,7 +134,24 @@ server.listen(0, async () => {
     const o = await c4.newPage(); await o.goto(url); await o.waitForTimeout(1000);
     const ot = await o.textContent('#toast');
     check(await o.evaluate(() => window.__HOH.H.n) === 5555 && !/taken down/.test(ot), `an old page is not told its draw was taken down ("${ot}")`);
+    // a list that starts right after the old page's provisional draw: the later draws are confirmed
+    latest = { updated: '2026-11-15T05:00:00Z', last_confirmed: 5561, draws: later.map((d, i) => ({ ...d, draw: 5556 + i })) };
+    const o2 = await c4.newPage(); await o2.goto(url); await o2.waitForTimeout(1000);
+    check(await o2.evaluate(() => window.__HOH.H.n) === 5561 && await o2.evaluate(() => window.__HOH.H.prov.size) === 1, 'only the stale draw is labelled provisional, not the confirmed ones after it');
     await c4.close(); await c2.close();
+    // after a correction, an older cached page (with the provisional result) does not repeat it
+    const c5 = await b.newContext({ ...devices['iPhone 13'] });
+    await c5.addInitScript((j) => { if (!localStorage.getItem('hoh:journal')) { localStorage.setItem('hoh:journal', j); localStorage.setItem('hoh:seenDraw', '5554'); } }, journal);
+    embedded = withProv; latest = withProv;
+    const s1 = await c5.newPage(); await s1.goto(url); await s1.waitForTimeout(800);
+    latest = { ...original, updated: '2026-11-01T05:00:00Z', draws: [...original.draws, { ...prov, numbers: [...nums.slice(0, 22), '7308'], confirmed: true }] };
+    await s1.evaluate(() => window.__HOH.fetchLive()); await s1.waitForTimeout(300);
+    check(/your number 7307 is not among them after all/.test(await s1.textContent('#toast')), 'correction told once');
+    await s1.evaluate(() => { document.querySelector('#toast').textContent = ''; });
+    await s1.reload(); await s1.waitForTimeout(900); // the page still embeds the provisional result
+    const s2 = await s1.textContent('#toast');
+    check(!/corrected|came up/.test(s2), `an older cached page does not repeat it ("${s2}")`);
+    await c5.close();
     embedded = null; latest = original;
   }
   await b.close(); server.close();
