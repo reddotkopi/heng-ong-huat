@@ -251,6 +251,7 @@ button { cursor: pointer; }
 .sheet .sh .fc.bk { background-size: 100% 200%; }
 .sheet .sh .t .fc.bk:not(.bx) { background-position: 0 0; }
 .sheet .sh .b .fc.bk { background-position: 0 100%; }
+.sheet .sh .t .fc.bx { background-position: 0 100%; }
 .sheet .ink { position: absolute; top: 0; left: 0; width: 200%; height: 100%; visibility: hidden; }
 .sheet .sv .r .ink { left: -100%; }
 .sheet.written .ink { visibility: visible; }
@@ -1307,6 +1308,7 @@ td { font-size: 0.9375rem; }
       case 'unfolded':
         h = `
           <h2><span class="brush" lang="zh-Hans">问</span>The slip reads ${R.digit}</h2>
+          ${settings.need === 3 ? `<p class="small">Three 圣杯 in a row are needed. So far: ${R.streak} of 3.</p>` : ''}
           <div class="actions"><button type="button" class="btn btn-primary btn-big" data-act="throw"><span class="brush" lang="zh-Hans">掷杯</span>Throw the blocks</button></div>
           <div class="prayer compact">
             <span class="cn" lang="zh-Hans">这个字是${CN_DIGIT[R.digit]}，若是${d.invite}所赐，请赐圣杯。</span>
@@ -1315,7 +1317,6 @@ td { font-size: 0.9375rem; }
           <p>${R.inputMode === 'motion'
             ? '<strong>Hold the phone firmly and give it one quick toss-and-stop flick.</strong> Never let go of your phone.'
             : '<strong>Swipe up on the altar</strong>, or tap Throw.'}</p>
-          ${settings.need === 3 ? `<p class="small">Three 圣杯 in a row are needed. So far: ${R.streak} of 3.</p>` : ''}
           ${modeNote()}`;
         break;
       case 'throwing':
@@ -2428,6 +2429,7 @@ td { font-size: 0.9375rem; }
   let currentView = 'seek';
   function showView(v) {
     if (!VIEWS.includes(v)) v = 'seek';
+    if (v !== 'seek') hands.classList.remove('bow', 'rattle');
     currentView = v;
     VIEWS.forEach((x) => { $('#' + x).hidden = x !== v; });
     $$('.rail a').forEach((a) => { if (a.dataset.view === v) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
