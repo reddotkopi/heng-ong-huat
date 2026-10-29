@@ -43,12 +43,23 @@ def published(first=None):
     return out
 
 
-def served(url=None):
-    """The same shape as published(), from the live site's latest.json."""
-    url = (url or os.environ.get('SITE_URL') or SITE_URL).rstrip('/') + f'/latest.json?t={int(time.time())}'
-    with urllib.request.urlopen(urllib.request.Request(url, headers={'Cache-Control': 'no-cache'}), timeout=30) as r:
-        draws = json.loads(r.read())['draws']
-    return {d['draw']: {'date': d['date'], 'top': d['numbers'][:3], 'confirmed': bool(d.get('confirmed', True))} for d in draws}
+def served(url=None, tries=4):
+    """The same shape as published(), from the live site's latest.json, including any older draws
+    it shows corrected."""
+    for i in range(tries):
+        try:
+            u = (url or os.environ.get('SITE_URL') or SITE_URL).rstrip('/') + f'/latest.json?t={int(time.time())}'
+            with urllib.request.urlopen(urllib.request.Request(u, headers={'Cache-Control': 'no-cache'}), timeout=30) as r:
+                j = json.loads(r.read())
+            break
+        except Exception:
+            if i == tries - 1:
+                raise
+            time.sleep(2 ** (i + 1))
+    out = {d['draw']: {'date': d['date'], 'top': d['numbers'][:3], 'confirmed': bool(d.get('confirmed', True))} for d in j['draws']}
+    for k, v in (j.get('corrected') or {}).items():
+        out.setdefault(int(k), {'date': v['date'], 'top': v['top'], 'confirmed': True})
+    return out
 
 
 def changes(before, after):
@@ -58,7 +69,7 @@ def changes(before, after):
         msgs.append(dict(after[k], kind='new', draw=k))
     fixed = [k for k in sorted(set(before) & set(after)) if before[k]['top'] != after[k]['top']]
     for k in fixed[-3:]:
-        msgs.append(dict(after[k], kind='correction', draw=k, was=before[k]['top']))
+        msgs.append(dict(after[k], kind='correction', draw=k, was=before[k]['top'], was_confirmed=before[k]['confirmed']))
     return msgs
 
 
@@ -81,6 +92,8 @@ def key_for(m):
     name = f"heng-ong-huat/{m['kind']}/{m['draw']}/{''.join(m['top'])}" + ('/confirmed' if m['confirmed'] else '')
     if m['kind'] == 'new':
         name += '/' + m.get('stamp', '')
+    elif m['kind'] == 'correction':  # and what it replaces, so undoing a correction is sent too
+        name += '/was/' + ''.join(m.get('was', [])) + ('/confirmed' if m.get('was_confirmed') else '')
     return str(uuid.UUID(bytes=hashlib.sha256(name.encode()).digest()[:16], version=4))
 
 
@@ -157,6 +170,16 @@ def main():
         pathlib.Path(args[1]).write_text(json.dumps(snap))
     elif args[:1] == ['--diff']:
         before = {int(k): v for k, v in json.loads(pathlib.Path(args[1]).read_text()).items()}
+        # A draw data/corrections.json changes that the live site does not show corrected yet (it
+        # may be older than the snapshot's window) was showing the archive's own result.
+        sys.path.insert(0, str(ROOT / 'scripts'))
+        from encode_history import read_draws
+        fixes = ROOT / 'data' / 'corrections.json'
+        if fixes.exists():
+            raw = read_draws(ROOT / 'data' / 'sp_4d_prizes.csv', corrections=False)
+            for k in map(int, json.loads(fixes.read_text())):
+                if k in raw and k not in before:
+                    before[k] = {'date': raw[k]['date'], 'top': raw[k]['nums'][:3], 'confirmed': True}
         msgs = changes(before, published(min(before) if before else None))
         updated = ROOT / 'data' / 'updated.txt'
         for m in msgs:

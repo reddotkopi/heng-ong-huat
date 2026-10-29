@@ -151,6 +151,12 @@ server.listen(0, async () => {
     await s1.reload(); await s1.waitForTimeout(900); // the page still embeds the provisional result
     const s2 = await s1.textContent('#toast');
     check(!/corrected|came up/.test(s2), `an older cached page does not repeat it ("${s2}")`);
+    // later the confirmed result itself is corrected (data/corrections.json): told on the next open
+    embedded = { ...original, updated: '2026-11-02T05:00:00Z', draws: [...original.draws, { ...prov, confirmed: true }] }; latest = embedded;
+    await s1.evaluate(() => { document.querySelector('#toast').textContent = ''; });
+    await s1.reload(); await s1.waitForTimeout(900);
+    const s3 = await s1.textContent('#toast');
+    check(/Draw 5555 results were corrected: your number 7307 came up, Consolation/.test(s3), `a later correction of a confirmed draw is told: "${s3}"`);
     await c5.close();
     embedded = null; latest = original;
   }

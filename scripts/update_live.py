@@ -20,7 +20,8 @@ import datetime, json, os, pathlib, sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'scripts'))
-from update_data import DATA, CROSSCHECK, fetch, parse, stamp, warn  # noqa: E402
+from encode_history import read_draws  # noqa: E402
+from update_data import DATA, CROSSCHECK, fetch, stamp, warn  # noqa: E402
 
 LIVE = ROOT / 'data' / 'live.json'
 SGT = datetime.timezone(datetime.timedelta(hours=8))
@@ -79,7 +80,7 @@ def merge(old, fresh, last):
 
 
 def main():
-    archive = parse(DATA.read_text())
+    archive = read_draws(DATA)  # with data/corrections.json applied
     if '--check' in sys.argv:
         feed = json.loads(pathlib.Path(sys.argv[sys.argv.index('--check') + 1]).read_text())['fourD']
         print(json.dumps(provisional(feed, archive)))

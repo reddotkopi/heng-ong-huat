@@ -66,18 +66,27 @@ appear without reinstalling. It tells you if a number in your journal came up.
 - every draw since 6 April 1991 has 23 numbers
 - it keeps every stored draw unchanged and adds to the end
 
-Otherwise it keeps the stored results and logs a warning. Draws before 6 April 1991 were tied to horse
+Otherwise it keeps the stored results and the run fails (see below); if the archive simply cannot
+be reached, it only logs a warning. Draws before 6 April 1991 were tied to horse
 races, so 210 of them have 17 to 27 winning numbers, and their records do not separate Starter from
 Consolation.
 
 **When the two sources disagree.** The archive is the confirmed source. If its 1st, 2nd or 3rd
-prize for a new draw differs from the fast feed's, the archive's result is published, the app and a
-correction alert put right the provisional result shown that evening, and the workflow run is
-marked failed so the repository owner is emailed. Check the draw on Singapore Pools' site. If the
-archive turns out to be wrong, add the right top three to `data/corrections.json`, for example
-`{"5555": {"top": ["1234", "5678", "9012"], "note": "1st and 2nd were swapped"}}`. Every published
-result then uses them, and a correction alert goes out. If the fast feed corrects a provisional
-draw itself, the app shows the new result and a correction alert goes out.
+prize or the date of a new draw differs from the fast feed's (or, if the feed cannot be read, from
+the provisional result published that evening), the archive's result is published, the app and a
+correction alert put right the provisional result, and the workflow run is marked failed so the
+repository owner is emailed. Check the draw on Singapore Pools' site. If the archive is wrong, add
+the right result to `data/corrections.json`, for example
+`{"5555": {"top": ["1234", "5678", "9012"], "note": "1st and 2nd were swapped"}}` (a `"date"`,
+written `"2026/10/31"`, can be corrected too). Every published result then uses it, and a
+correction alert goes out. If the fast feed corrects a provisional draw itself, the app shows the
+new result and a correction alert goes out.
+
+The archive may later put right a draw it already published: that is accepted when the new version
+agrees with the fast feed, or when its top three are the ones in `data/corrections.json` (the entry
+can then be removed). Any other change to a stored draw, or a new file that fails the checks above,
+is not accepted: confirmed results stop, and every run fails until it is looked into, so it cannot
+go unnoticed. Same-evening results keep coming meanwhile.
 
 `scripts/update_live.py` takes a same-evening draw only if it follows on from the archive with no gap,
 is not dated in the future, has 23 four-digit numbers, and lists its Starter and Consolation prizes
@@ -158,6 +167,8 @@ ONESIGNAL_APP_ID=12345678-abcd-4ef0-9abc-1234567890ab python3 scripts/build.py &
 | `src/heng-ong-huat.html` | The whole app: markup, styles and script. `__HISTORY_DATA__`, `__LIVE_DATA__` and `__ONESIGNAL_APP_ID__` are filled in at build time. |
 | `data/sp_4d_prizes.csv` | Every winning number: `draw_number,number,date`, in prize order. |
 | `data/live.json` | Same-evening draws not yet in the archive (provisional). |
+| `data/corrections.json` | Optional: the owner's fixes for a draw the archive has wrong. |
+| `data/updated.txt`, `data/corrections.sha` | When the published results last changed (the app ignores older copies), and which corrections that includes. |
 | `scripts/` | Build, data encoding, the two result updaters, the evening watcher and `notify.py` (result alerts). |
 | `pwa/sw.js` | Offline cache. |
 | `assets/icons/` | App icons. |

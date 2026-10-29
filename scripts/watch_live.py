@@ -19,7 +19,8 @@ import datetime, json, os, pathlib, sys, time
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'scripts'))
-from update_data import CROSSCHECK, DATA, fetch, parse, pinned, warn  # noqa: E402
+from encode_history import read_draws  # noqa: E402
+from update_data import CROSSCHECK, DATA, fetch, pinned, warn  # noqa: E402
 from update_live import LIVE, SGT, provisional  # noqa: E402
 
 DRAW_DAYS = {2, 5, 6}  # Wednesday, Saturday, Sunday
@@ -42,7 +43,7 @@ def output(**kv):
 
 
 def published():
-    archive = parse(DATA.read_text())
+    archive = read_draws(DATA)
     live = json.loads(LIVE.read_text())['draws'] if LIVE.exists() else []
     dates = {archive[max(archive)]['date']} | {d['date'] for d in live}
     return archive, max([max(archive)] + [d['draw'] for d in live]), dates

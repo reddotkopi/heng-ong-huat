@@ -2210,10 +2210,11 @@ td { font-size: 0.9375rem; }
         : ae.dataset.jact && li ? `#journalList [data-id="${li.dataset.id}"] [data-jact="${ae.dataset.jact}"]`
         : ae.dataset.draw ? `#${host.id} [data-draw="${ae.dataset.draw}"]` : null;
     }
+    const nth = sel ? Math.max(0, $$(sel).indexOf(ae)) : 0; // the same number can be on two buttons
     const scrolls = ['#lookupResult', '#memBody'].map((id) => { const w = $(`${id} .table-wrap`); return [id, w ? w.scrollTop : 0]; });
     return () => {
       for (const [id, top] of scrolls) { const w = $(`${id} .table-wrap`); if (w && top) w.scrollTop = top; }
-      const el = sel && $(sel);
+      const all = sel ? $$(sel) : [], el = all[nth] || all[0];
       if (el) el.focus({ preventScroll: true });
     };
   }
@@ -2230,28 +2231,29 @@ td { font-size: 0.9375rem; }
     tell(news);
     store.set('seenDraw', Math.max(seen, H.n));
   }
-  // What this phone was shown of each provisional draw, kept across visits, so a correction,
-  // a withdrawal or a draw coming back is told even if it happened while the app was closed.
-  // A record is only compared with data at least as new as the data it was shown from (pages
-  // served from an older cache are skipped), a draw is only taken as gone when the data reaches
-  // it (`reach`), and once a draw is confirmed it is never recorded again. Kept in memory too,
-  // for phones that block site storage.
+  // What this phone was shown of each provisional draw (and of it once confirmed, for its last ten
+  // draws), kept across visits, so a correction, a withdrawal or a draw coming back is told even if
+  // it happened while the app was closed. A record is only compared with data at least as new as
+  // the data it was shown from (pages served from an older cache are skipped) and, after a fetch,
+  // only with draws the fetched list covers and joins up with (`reach`). A draw whose record has
+  // been dropped is never recorded again. Kept in memory too, for phones that block site storage.
   let provMem = {};
   function reconcile(reach) {
     const shown = store.get('provShown', null) || provMem, done = store.get('provDone', 0), out = [];
     for (const key of Object.keys(shown)) {
       const k = Number(key), rec = shown[key];
       if (!rec || !Array.isArray(rec.numbers)) { delete shown[key]; continue; }
+      if (k <= H.n - 10) { delete shown[key]; store.set('provDone', Math.max(store.get('provDone', 0), k)); continue; }
       if (rec.stamp && (!liveStamp || liveStamp < rec.stamp)) continue;
       if (k > H.n) {
-        if (!rec.gone && k >= reach) { rec.gone = true; rec.stamp = liveStamp; out.push({ text: `Draw ${k} results were taken down while they are checked. Check Singapore Pools for the official results.`, prio: 2 }); }
+        if (!rec.gone && !rec.confirmed && k >= reach && reach <= H.n + 1) { rec.gone = true; rec.stamp = liveStamp; out.push({ text: `Draw ${k} results were taken down while they are checked. Check Singapore Pools for the official results.`, prio: 2 }); }
         continue;
       }
+      if (k < reach) continue; // the fetched list says nothing about this draw; the page's copy may be older
       const d = drawRecord(k - 1);
       if (rec.gone) out.push(rec.numbers.join() === d.numbers.join() ? drawsNews([d], 2) : correctionNews(rec, d));
       else if (rec.numbers.join() !== d.numbers.join()) out.push(correctionNews(rec, d));
-      if (d.confirmed) { delete shown[key]; store.set('provDone', Math.max(store.get('provDone', 0), k)); }
-      else shown[key] = { numbers: d.numbers, stamp: liveStamp };
+      shown[key] = { numbers: d.numbers, stamp: liveStamp, confirmed: d.confirmed };
     }
     for (const di of H.prov) if (!shown[di + 1] && di + 1 > done) shown[di + 1] = { numbers: drawRecord(di).numbers, stamp: liveStamp };
     provMem = shown; store.set('provShown', shown);
@@ -2319,7 +2321,7 @@ td { font-size: 0.9375rem; }
     const supported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
     const card = $('#alertsCard'), state = $('#alertsState'), btn = $('#alertsBtn'), actions = $('#alertsActions');
     const base = location.pathname.replace(/[^/]*$/, '');
-    let busy = false, shownOn = false, offAsked = false, ready = null, script = null, loadFailed = [];
+    let busy = false, shownOn = false, offAsked = false, renewing = null, inflight = null, ready = null, script = null, loadFailed = [];
     const isOn = () => supported() && store.get('alerts', false) && Notification.permission === 'granted';
     const within = (promise, what) => Promise.race([promise, new Promise((_, no) => setTimeout(() => no(new Error(`${what} took too long`)), 20000))]);
     // OneSignal can be set up only once per page, so there is one init for the page's life;
@@ -2392,8 +2394,8 @@ td { font-size: 0.9375rem; }
         if ((await asked) !== 'granted') { busy = false; render(); return; }
         const OneSignal = await load();
         // permission is already granted, so this shows no prompt; it creates the push subscription
-        if (!(await within(OneSignal.Notifications.requestPermission(), 'Subscribing'))) throw new Error('could not subscribe');
-        await within(OneSignal.User.PushSubscription.optIn(), 'Subscribing');
+        if (!(await within(inflight = OneSignal.Notifications.requestPermission(), 'Subscribing'))) throw new Error('could not subscribe');
+        await within(inflight = OneSignal.User.PushSubscription.optIn(), 'Subscribing');
         // only say "on" once this phone really has a push subscription (OneSignal's own fields
         // can still hold one from before alerts were last turned off)
         const ps = await pushSub();
@@ -2401,6 +2403,16 @@ td { font-size: 0.9375rem; }
         store.set('alerts', true); store.set('alertsSync', Date.now()); store.set('alertsEndpoint', ps.endpoint);
         busy = false; render('Alerts are on. You’ll get one when the next results are in.');
       } catch {
+        // OneSignal may still finish later (init subscribes once permission is granted, or a call
+        // is still running): undo it then, as for a turn-off, unless the user tries again
+        offAsked = true;
+        if (ready) {
+          ready.then((OneSignal) => Promise.resolve(inflight).catch(() => {}).then(() => {
+            if (!offAsked) return;
+            OneSignal.User.PushSubscription.optOut().catch(() => {});
+            pushSub().then((ps) => ps && ps.unsubscribe()).catch(() => {});
+          })).catch(() => {});
+        }
         busy = false; render('Could not turn alerts on just now. Check your connection and try again.');
       }
     }
@@ -2411,6 +2423,7 @@ td { font-size: 0.9375rem; }
       let told = false, dropped = false;
       try {
         const OneSignal = await load();
+        await renewing; // a renewal already under way finishes first, so it cannot re-subscribe afterwards
         await within(OneSignal.User.PushSubscription.optOut(), 'Unsubscribing');
         told = true;
       } catch { /* offline or blocked: dropping the subscription below still stops alerts */ }
@@ -2445,7 +2458,7 @@ td { font-size: 0.9375rem; }
         const same = ps && ps.endpoint === store.get('alertsEndpoint', '');
         if (same && Date.now() - store.get('alertsSync', 0) <= 7 * DAY) return null;
         return load()
-          .then((OneSignal) => (same ? null : within(OneSignal.Notifications.requestPermission(), 'Subscribing')))
+          .then((OneSignal) => (same || offAsked ? null : (renewing = within(OneSignal.Notifications.requestPermission(), 'Subscribing').catch(() => null))))
           .then(pushSub)
           .then((now) => { store.set('alertsSync', Date.now()); store.set('alertsEndpoint', now ? now.endpoint : ''); });
       }).catch(() => {});

@@ -38,6 +38,7 @@ jobs:
       deploy: ${{ steps.check.outputs.deploy }}
       notify: ${{ steps.check.outputs.notify }}
       disagree: ${{ steps.archive.outputs.disagree }}
+      stalled: ${{ steps.archive.outputs.stalled }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -120,15 +121,23 @@ jobs:
           ONESIGNAL_SEGMENT: ${{ vars.ONESIGNAL_SEGMENT }}
         run: python3 scripts/notify.py --send
 
-  # The archive and the fast feed disagreed on a new draw's top three prizes. The archive's result
-  # is published (it is the confirmed source); fail the run so the owner is emailed to check it.
-  disagree:
+  # Something about the results needs the owner: fail the run (after deploying) so they are emailed.
+  # - disagree: the archive and the fast feed differ on a new draw's top three prizes or date; the
+  #   archive's result is published (it is the confirmed source)
+  # - stalled: the archive's new file was not accepted, so confirmed results have stopped
+  check-results:
     needs: [build, deploy, notify]
-    if: always() && needs.build.outputs.disagree != ''
+    if: always() && (needs.build.outputs.disagree != '' || needs.build.outputs.stalled != '')
     runs-on: ubuntu-latest
     steps:
       - env:
-          DRAWS: ${{ needs.build.outputs.disagree }}
+          DISAGREE: ${{ needs.build.outputs.disagree }}
+          STALLED: ${{ needs.build.outputs.stalled }}
         run: |
-          echo "::error::The archive and the fast feed disagree on the top three prizes of draw $DRAWS. The archive's result is published. Check it on Singapore Pools; if it is wrong, put the right numbers in data/corrections.json (see README)."
+          if [ -n "$DISAGREE" ]; then
+            echo "::error::The archive and the fast feed disagree on the top three prizes or the date of draw $DISAGREE (the build job's 'Refresh confirmed results' step shows both). The archive's result is published. Check it on Singapore Pools; if it is wrong, put the right result in data/corrections.json (see README)."
+          fi
+          if [ -n "$STALLED" ]; then
+            echo "::error::The archive's latest file was not accepted, so confirmed results have stopped after draw $STALLED (the build job's 'Refresh confirmed results' step says why). See README: when the two sources disagree."
+          fi
           exit 1

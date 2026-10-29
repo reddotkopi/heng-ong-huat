@@ -7,19 +7,27 @@ The new file replaces the old one only if it passes every check:
   - it is not shorter than the old file and every old draw is unchanged
 Otherwise the old file is kept and a warning is printed, so the site still builds.
 
-The archive is the confirmed source. If its 1st, 2nd or 3rd prize for a new draw differs from the
-fast feed's, its result is still used (and the app and the alerts correct the provisional one),
-but the draw is reported with ::error:: and as `disagree=` in $GITHUB_OUTPUT, so the workflow run
-fails and the owner is emailed to check it. If the archive turns out to be wrong, put the right
-top three in data/corrections.json (see encode_history.py).
+The archive is the confirmed source. If its 1st, 2nd or 3rd prize or the date of a new draw differs
+from the fast feed's (or, when the feed cannot be read, from the provisional result published that
+evening), its result is still used (the app and the alerts correct the provisional one), but the
+draw is reported with ::error:: and as `disagree=` in $GITHUB_OUTPUT, so the workflow run fails and
+the owner is emailed to check it. If the archive turns out to be wrong, put the right result in
+data/corrections.json (see encode_history.py).
+
+A stored draw may change only when the archive puts right its own mistake: the new version agrees
+with the fast feed, or its top three are the ones in data/corrections.json and nothing else
+changed. Any other change, or a file that fails the checks above, keeps the stored results and is
+reported as `stalled=` so the run fails: confirmed results stop until it is looked into.
 
   python3 scripts/update_data.py          refresh (exit 0 even when the source is unusable)
   python3 scripts/update_data.py --last   print the latest draw in the current file
 """
-import csv, datetime, io, json, os, pathlib, re, subprocess, sys, time, urllib.request
+import csv, datetime, hashlib, io, json, os, pathlib, re, subprocess, sys, time, urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DATA = ROOT / 'data' / 'sp_4d_prizes.csv'
+CORRECTIONS = ROOT / 'data' / 'corrections.json'
+CORRECTIONS_SEEN = ROOT / 'data' / 'corrections.sha'
 UPDATED = ROOT / 'data' / 'updated.txt'
 SOURCE = 'https://raw.githubusercontent.com/playingmeow/SingaporePools/main/4d_prizes.csv'
 CROSSCHECK = 'https://raw.githubusercontent.com/darrentan90/hobeh-draws/main/latest.json'
@@ -93,31 +101,82 @@ def stamp():
     UPDATED.write_text(datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ') + '\n')
 
 
-def crosscheck(draws, stored):
-    """Compare the top three prizes and the date of each draw with the fast feed. Returns the new
-    draws (not stored yet) the two disagree on; a stored draw the feed changed later only warns."""
+def output(key, values):
+    if values and os.environ.get('GITHUB_OUTPUT'):
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+            f.write(f"{key}={' '.join(map(str, values))}\n")
+
+
+def read_feed():
+    """The fast feed's draws, or None when it cannot be read."""
     try:
-        feed = json.loads(fetch(CROSSCHECK))['fourD']
+        return json.loads(fetch(CROSSCHECK))['fourD']
     except Exception as e:
-        warn(f'cross-check feed unavailable ({e}); skipping it')
-        return []
-    differ, checked = [], 0
-    for e in feed:
-        n = e.get('draw_no')
-        if not isinstance(n, int) or n not in draws:
+        warn(f'fast feed unavailable ({e})')
+        return None
+
+
+def feed_view(feed):
+    """{draw: (date, top three, sorted Starters, sorted Consolations)} from the fast feed or, when it
+    cannot be read, from the provisional results already published (its word from that evening)."""
+    if feed is None:
+        live = ROOT / 'data' / 'live.json'
+        draws = json.loads(live.read_text())['draws'] if live.exists() else []
+        return {d['draw']: (d['date'].replace('/', '-'), d['numbers'][:3], sorted(d['numbers'][3:13]), sorted(d['numbers'][13:]))
+                for d in draws}
+    return {e['draw_no']: (e.get('draw_date'), [e.get('first'), e.get('second'), e.get('third')],
+                           sorted(e.get('starters') or []), sorted(e.get('consolations') or []))
+            for e in feed if isinstance(e.get('draw_no'), int)}
+
+
+def as_view(d):
+    n = d['nums']
+    return (d['date'].replace('/', '-'), n[:3], sorted(n[3:13]), sorted(n[13:]))
+
+
+def check_stored(old, new, view):
+    """Stored draws the new file changes. Only the archive putting right its own mistake is let
+    through (see above); anything else raises."""
+    try:
+        fixes = json.loads(CORRECTIONS.read_text()) if CORRECTIONS.exists() else {}
+    except ValueError:
+        fixes = {}
+    fixed = []
+    for k, d in old.items():
+        n = new[k]
+        if n == d:
             continue
-        ours, theirs = draws[n]['nums'][:3], [e.get('first'), e.get('second'), e.get('third')]
-        if ours == theirs and draws[n]['date'].replace('/', '-') == e.get('draw_date'):
+        fix = fixes.get(str(k)) if isinstance(fixes, dict) else None
+        if view.get(k) == as_view(n) or (isinstance(fix, dict) and n['date'] == d['date'] and n['nums'][3:] == d['nums'][3:] and n['nums'][:3] == fix.get('top')):
+            fixed.append(k)
+            continue
+        raise ValueError(f'the archive changed the already-stored draw {k} ({d["date"]} {d["nums"][:3]} to {n["date"]} {n["nums"][:3]}), '
+                         'and the fast feed does not confirm the change')
+    return fixed
+
+
+def crosscheck(draws, stored, view):
+    """New draws (not stored yet) whose top three or date differ from the fast feed's."""
+    differ, checked = [], 0
+    for n in sorted(k for k in view if stored < k <= max(draws)):
+        mine, theirs = as_view(draws[n]), view[n]
+        if mine[:2] == theirs[:2]:
             checked += 1
             continue
-        what = f"draw {n}: the archive has {draws[n]['date']} {ours}, the fast feed {e.get('draw_date')} {theirs}"
-        if n <= stored:
-            warn(f'{what}; the stored result is kept')
-        else:
-            differ.append(n)
-            print(f"::error::{what}; the archive's result is used. Check it on Singapore Pools (see README)")
-    print(f'cross-checked the top three prizes of {checked} draws')
+        differ.append(n)
+        print(f"::error::draw {n}: the archive has {draws[n]['date']} {mine[1]}, the fast feed {theirs[0]} {theirs[1]}; "
+              "the archive's result is used. Check it on Singapore Pools (see README)")
+    print(f'cross-checked the top three prizes and date of {checked} new draws')
     return differ
+
+
+def note_corrections():
+    """Moves the results stamp when data/corrections.json changes, so the app takes the corrected
+    results as newer than any copy it already has."""
+    h = hashlib.sha256(CORRECTIONS.read_bytes()).hexdigest()[:16] if CORRECTIONS.exists() else ''
+    if h != (CORRECTIONS_SEEN.read_text().strip() if CORRECTIONS_SEEN.exists() else ''):
+        CORRECTIONS_SEEN.write_text(h + '\n')
+        stamp()
 
 
 def last(draws):
@@ -131,27 +190,33 @@ def main():
         k, d = last(old)
         print(f'{k} ({d})')
         return
+    note_corrections()
     try:
         text = fetch(SOURCE)
+    except Exception as e:
+        warn(f'archive unavailable ({e}); kept the existing results')
+        return
+    view = feed_view(read_feed())
+    try:
         new = parse(text)
         if max(new) < max(old):
             raise ValueError(f'source has {max(new)} draws, fewer than the {max(old)} already stored')
-        for k, d in old.items():
-            if new[k] != d:
-                raise ValueError(f'source changed the already-stored draw {k}')
-        differ = crosscheck(new, max(old))
+        fixed = check_stored(old, new, view)
     except Exception as e:
-        warn(f'kept the existing results: {e}')
+        print(f'::error::kept the existing results: {e}. Confirmed results stop until this is looked into (see README)')
+        output('stalled', [max(old)])
         return
-    if max(new) == max(old):
+    differ = crosscheck(new, max(old), view)
+    if new == old:
         print(f'no new draws; latest is {last(old)[0]} ({last(old)[1]})')
         return
     DATA.write_text(text if text.endswith('\n') else text + '\n')
     stamp()
-    if differ and os.environ.get('GITHUB_OUTPUT'):
-        with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-            f.write(f"disagree={' '.join(map(str, differ))}\n")
-    print(f'added draws {max(old) + 1} to {max(new)}; latest is {last(new)[1]}')
+    if fixed:
+        print(f"::notice::the archive corrected stored draw {', '.join(map(str, fixed))}; "
+              'a data/corrections.json entry for it is no longer needed')
+    output('disagree', differ)
+    print(f'archive now to draw {max(new)} ({last(new)[1]})')
 
 
 if __name__ == '__main__':

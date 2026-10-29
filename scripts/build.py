@@ -27,9 +27,13 @@ def main():
     provisional = json.loads(live_path.read_text())['draws'] if live_path.exists() else []
     last = max(archive)
     updated = ROOT / 'data' / 'updated.txt'
+    fixes = ROOT / 'data' / 'corrections.json'
     latest = {
         # when the results last changed: the app ignores a copy older than the one it has
         'updated': updated.read_text().strip() if updated.exists() else '',
+        # draws data/corrections.json changes, as published (the alert job compares with these)
+        'corrected': {k: {'date': archive[int(k)]['date'], 'top': archive[int(k)]['nums'][:3]}
+                      for k in (json.loads(fixes.read_text()) if fixes.exists() else {})},
         'last_confirmed': last,
         'draws': [{'draw': k, 'date': archive[k]['date'], 'numbers': archive[k]['nums'], 'confirmed': True}
                   for k in range(max(1, last - RECENT + 1), last + 1)]
