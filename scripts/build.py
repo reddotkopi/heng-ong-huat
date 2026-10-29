@@ -11,7 +11,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'scripts'))
 from encode_history import encode, read_draws  # noqa: E402
 
-RECENT = 6  # archive draws repeated in latest.json, so an old cached page can catch up
+RECENT = 10  # archive draws repeated in latest.json (the same ten the alerts and the app's records cover), so an old or open page can catch up
 
 DESCRIPTION = ('Ask your ancestors or a deity for a 4D number: write and fold ten slips, pray, throw the '
                'moon blocks, then see the number in every Singapore Pools draw since 1986.')

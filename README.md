@@ -124,8 +124,9 @@ How it behaves:
 
 - Alerts are opt-in, from the **Result alerts** card on the History tab. OneSignal's code is loaded only
   after someone turns alerts on. It runs in its own service worker under `push/`, apart from the
-  app's offline cache. When alerts are turned on or off (and on the next visit after that), about
-  once a week while they are on, and when the phone's push address changes, OneSignal receives the
+  app's offline cache. When alerts are turned on or off, about once a week while they are on, when
+  the phone's push address changes, and on the next visit after turning them on or after the address
+  changes, OneSignal receives the
   phone's push address, IP address, device and browser version, language and time zone, and for
   the rest of that visit, when the app is in use. It also learns whether alerts arrive and are
   opened, and when one arrives the phone may download OneSignal's alert code from its servers. It

@@ -181,6 +181,11 @@ server.listen(0, async () => {
     const w2 = await w1.textContent('#toast');
     check(/Draw 5554 results were corrected: your number 6205 came up, 3rd Prize/.test(w2) && await w1.evaluate(() => window.__HOH.H.drawNumbers(5553)[2]) === 6205, `an open page takes and tells a correction to an archive draw ("${w2}")`);
     check(await w1.evaluate(() => window.__HOH.H.n) === 5554, 'the history length is unchanged');
+    // the same for a draw seven back (latest.json repeats the last ten archive draws)
+    latest = { ...latest, updated: '2026-11-04T05:00:00Z', draws: fixed.map((d) => (d.draw === 5548 ? { ...d, numbers: ['0001', ...d.numbers.slice(1)] } : d)) };
+    await w1.evaluate(() => { document.querySelector('#toast').textContent = ''; }); await w1.evaluate(() => window.__HOH.fetchLive()); await w1.waitForTimeout(400);
+    const w3 = await w1.textContent('#toast');
+    check(/Draw 5548 results were corrected: 1st 0001/.test(w3) && await w1.evaluate(() => window.__HOH.H.drawNumbers(5547)[0]) === 1, `an open page takes a correction seven draws back ("${w3}")`);
     await c7.close();
     embedded = null; latest = original;
   }
