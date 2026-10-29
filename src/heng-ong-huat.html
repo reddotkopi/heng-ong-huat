@@ -1,0 +1,2218 @@
+<title>Heng Ong Huat</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;1,400&family=Barlow+Condensed:wght@500;600;700&family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<style>
+/* Layout: one altar column (max 30rem): lacquer plaque, then the altar stage where the ritual plays out, then the step panel; tabs sit on a fixed lacquer rail. One deliberate visual world (an altar at night), so a single dark theme. */
+:root {
+  --wood: #1b0f0b;
+  --wood-2: #26150f;
+  --wood-3: #3a2118;
+  --lacquer: #b0281d;
+  --lacquer-deep: #5e120d;
+  --gold: #e2b355;
+  --gold-soft: #a9853d;
+  --paper: #f1d57f;
+  --paper-edge: #d8b55b;
+  --paper-hi: #f9e7ad;
+  --paper-back: #e0bd66;
+  --paper-back-hi: #efd38a;
+  --ink: #1e1511;
+  --cinnabar: #c0392b;
+  --copper: #c8743a;
+  --text: #f1e6d6;
+  --muted: #b5a291;
+  --line: rgba(226, 179, 85, 0.22);
+  --line-strong: rgba(226, 179, 85, 0.5);
+  --veil: rgba(27, 15, 11, 0.72);
+  --yes: #e9c15f;
+  --laugh: #f1d57f;
+  --no: #d4847a;
+  --font-brush: "Ma Shan Zheng", "Kaiti SC", "STKaiti", "KaiTi", "BiauKai", serif;
+  --font-cond: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+  --font-body: "Barlow", "Noto Sans SC", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-cjk: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --step--1: 0.8125rem;
+  --step-0: 1rem;
+  --step-1: 1.25rem;
+  --step-2: 1.625rem;
+  --step-3: 2.25rem;
+  --radius: 14px;
+  --rail-h: 64px;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: auto; min-height: 100%; }
+html { scroll-padding-bottom: calc(var(--rail-h) + 16px + env(safe-area-inset-bottom, 0px)); }
+body {
+  background:
+    radial-gradient(120% 60% at 50% -10%, rgba(176, 40, 29, 0.28), transparent 60%),
+    repeating-linear-gradient(92deg, rgba(255, 255, 255, 0.012) 0 2px, transparent 2px 9px),
+    var(--wood);
+  color: var(--text);
+  font: 400 var(--step-0)/1.5 var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+:lang(zh-Hans), .cjk { font-family: var(--font-cjk); }
+.brush { font-family: var(--font-brush); font-weight: 400; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+p { margin: 0; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 6px; }
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+#app {
+  max-width: 30rem;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 12px calc(var(--rail-h) + 28px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ---------- Plaque (temple signboard) ---------- */
+.plaque { display: flex; align-items: center; gap: 12px; }
+.plaque-board {
+  flex: 1;
+  display: flex; align-items: baseline; justify-content: center; gap: 12px;
+  padding: 8px 14px 6px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #160b08, #0f0705);
+  border: 2px solid var(--lacquer);
+  box-shadow: inset 0 0 0 1px var(--gold-soft), 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+.plaque-cn { font-family: var(--font-brush); font-size: 2rem; line-height: 1; color: var(--gold); letter-spacing: 0.12em; text-shadow: 0 1px 0 #6b4a17; }
+.plaque-en { font-family: var(--font-cond); font-weight: 600; font-size: 0.875rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--muted); }
+.icon-btn {
+  width: 44px; height: 44px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: var(--wood-2);
+  color: var(--gold);
+}
+.icon-btn svg { width: 22px; height: 22px; }
+.icon-btn[aria-pressed="false"] { color: var(--muted); }
+
+.next-draw {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px;
+  font-family: var(--font-cond); font-size: 0.9375rem; letter-spacing: 0.04em; color: var(--muted);
+}
+.next-draw b { color: var(--text); font-weight: 600; }
+
+/* ---------- Views ---------- */
+.view { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.view-title { font-family: var(--font-cond); font-weight: 700; font-size: var(--step-2); letter-spacing: 0.02em; line-height: 1.1; }
+.view-title .brush { color: var(--gold); margin-right: 8px; font-size: 1.15em; }
+.lede { color: var(--muted); max-width: 62ch; }
+.section-title { font-family: var(--font-cond); font-weight: 600; font-size: var(--step-1); letter-spacing: 0.03em; color: var(--text); display: flex; align-items: baseline; gap: 8px; }
+.section-title .brush { color: var(--gold); font-size: 1.1em; }
+.eyebrow { font-family: var(--font-cond); font-weight: 600; font-size: 0.8125rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold-soft); }
+
+/* ---------- Number slots (seal stamps) ---------- */
+.slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.slot {
+  aspect-ratio: 1 / 1.08; max-width: 100%;
+  display: grid; place-items: center;
+  border-radius: 10px;
+  border: 1.5px dashed var(--line-strong);
+  background: rgba(0, 0, 0, 0.18);
+  font-family: var(--font-cond); font-weight: 700; font-size: 2.6rem; line-height: 1;
+  color: var(--muted);
+  position: relative;
+  font-variant-numeric: tabular-nums;
+}
+.slot small { position: absolute; top: 6px; left: 8px; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.1em; color: var(--muted); }
+.slot.current { border-style: solid; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(226, 179, 85, 0.12); }
+.slot.filled {
+  border: none;
+  color: var(--gold);
+  background: radial-gradient(120% 120% at 30% 20%, #c8382a, var(--lacquer) 45%, var(--lacquer-deep));
+  box-shadow: inset 0 0 0 2px rgba(255, 220, 160, 0.18), 0 6px 14px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+}
+.slot.filled small { color: rgba(255, 230, 190, 0.7); }
+.slot.stamp { animation: stamp 520ms cubic-bezier(.2, 1.4, .4, 1) both; }
+@keyframes stamp { 0% { transform: scale(1.5); opacity: 0; } 60% { transform: scale(0.94); opacity: 1; } 100% { transform: scale(1); } }
+
+/* ---------- Altar stage ---------- */
+.stage {
+  position: relative;
+  height: clamp(320px, 50vh, 430px);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background:
+    radial-gradient(70% 55% at 50% 30%, rgba(226, 120, 60, 0.16), transparent 70%),
+    linear-gradient(180deg, #1f100b 0%, #170c08 62%, transparent 62%),
+    repeating-linear-gradient(178deg, #3b2015 0 3px, #341c12 3px 7px, #3f2318 7px 9px);
+  border: 1px solid var(--line);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-y;
+}
+.stage.gesture { touch-action: none; }
+.stage.intro { height: clamp(250px, 38vh, 340px); }
+.stage.done { display: none; }
+.stage::after { /* front edge of the altar table */
+  content: ""; position: absolute; left: 0; right: 0; top: 62%; height: 3px;
+  background: linear-gradient(90deg, transparent, var(--gold-soft), transparent);
+  opacity: 0.6;
+}
+.tablet {
+  position: absolute; top: 14px; left: 14px;
+  writing-mode: vertical-rl;
+  font-family: var(--font-brush); font-size: 1.25rem; letter-spacing: 0.14em;
+  color: var(--gold);
+  padding: 10px 5px;
+  border-radius: 4px 4px 2px 2px;
+  background: linear-gradient(180deg, #8f1f16, #5e120d);
+  border: 1px solid var(--gold-soft);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  opacity: 0.92;
+}
+.stage-caption {
+  position: absolute; top: 14px; right: 14px;
+  text-align: right;
+  font-family: var(--font-cond); font-size: 0.8125rem; letter-spacing: 0.08em; color: var(--muted);
+}
+.stage.reading .stage-caption, .stage:has(.sheet.big) .stage-caption, .stage:has(.verdict:not([hidden])) .stage-caption { opacity: 0; }
+.stage-caption b { display: block; color: var(--gold); font-weight: 600; font-size: 0.9375rem; }
+#smoke { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.urn { position: absolute; right: 18px; top: calc(62% - 58px); width: 64px; height: 92px; pointer-events: none; }
+.hands {
+  position: absolute; left: 50%; top: 3%;
+  height: 64%; width: auto; aspect-ratio: 240 / 320; max-width: 62%;
+  transform: translateX(-50%) translateY(calc(var(--hy, 0) * 1px)) rotate(calc(var(--hr, 0) * 1deg));
+  transform-origin: 50% 85%;
+  overflow: visible;
+  transition: opacity 400ms;
+  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.5));
+}
+.hands.bow { animation: bow 640ms cubic-bezier(.45, 0, .3, 1); }
+@keyframes bow {
+  0% { transform: translateX(-50%); }
+  45% { transform: translateX(-50%) translateY(22px) rotate(-5deg) scale(0.97); }
+  100% { transform: translateX(-50%); }
+}
+.hands.rattle .peek { animation: rattle 260ms steps(3) 2; }
+@keyframes rattle { 0% { transform: translate(0, 0); } 33% { transform: translate(-1.5px, 1px) rotate(-3deg); } 66% { transform: translate(1.5px, -1px) rotate(2deg); } }
+.hands .peek { transform-box: fill-box; transform-origin: center; }
+.hands.away { opacity: 0.22; }
+.hands.gone { opacity: 0; }
+
+.slip {
+  position: absolute; left: 0; top: 0;
+  width: 30px; height: 38px;
+  border: 0; padding: 0;
+  border-radius: 2px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 45%),
+    linear-gradient(180deg, var(--paper-back-hi), var(--paper-back));
+  box-shadow: inset 0 0 0 1px rgba(150, 110, 40, 0.35), 0 3px 6px rgba(0, 0, 0, 0.45);
+  will-change: transform;
+}
+.slip::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: rgba(120, 80, 20, 0.28); }
+
+/* Paper sheets: the full sheet folds right over left, then the half sheet top over bottom */
+.sheet { position: absolute; left: 0; top: 0; width: var(--w); height: var(--h); perspective: 900px; transform-origin: 25% 75%; pointer-events: none; z-index: 3; --fold-ms: 300ms; }
+.sheet.big { left: 50%; top: 4%; translate: -50% 0; z-index: 4; }
+.sheet .sv, .sheet .sh { position: absolute; transform-style: preserve-3d; }
+.sheet .sv { inset: 0; }
+.sheet .sh { left: 0; top: 0; width: 50%; height: 100%; display: none; }
+.sheet.f1done .sv { display: none; }
+.sheet.f1done .sh { display: block; }
+.sheet .lf { position: absolute; transform-style: preserve-3d; transition: transform var(--fold-ms) cubic-bezier(.45, .05, .4, 1); }
+.sheet .sv .lf { top: 0; width: 50%; height: 100%; }
+.sheet .sv .l { left: 0; }
+.sheet .sv .r { left: 50%; transform-origin: 0 50%; }
+.sheet.f1 .sv .r { transform: rotateY(-180deg); }
+.sheet .sh .lf { left: 0; width: 100%; height: 50%; }
+.sheet .sh .b { top: 50%; }
+.sheet .sh .t { top: 0; transform-origin: 50% 100%; }
+.sheet.f2 .sh .t { transform: rotateX(-180deg); }
+.sheet .fc {
+  position: absolute; inset: 0; overflow: hidden;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  background:
+    linear-gradient(180deg, transparent 49.4%, rgba(120, 80, 20, 0.14) 50%, transparent 50.6%),
+    radial-gradient(130% 100% at 30% 20%, var(--paper-hi), var(--paper) 60%, var(--paper-edge));
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+}
+.sheet .sv .l .fc { border-radius: 3px 0 0 3px; box-shadow: inset -1px 0 0 rgba(120, 80, 20, 0.2), 0 6px 14px rgba(0, 0, 0, 0.35); }
+.sheet .sv .r .fc { border-radius: 0 3px 3px 0; }
+.sheet .fc.by { transform: rotateY(180deg); background: linear-gradient(200deg, var(--paper-back-hi), var(--paper-back)); }
+.sheet .fc.bk { background: linear-gradient(160deg, var(--paper-back-hi), var(--paper-back)); border-radius: 0 0 0 3px; }
+.sheet .fc.bx { transform: rotateX(180deg); border-radius: 3px 0 0 0; }
+.sheet .ink { position: absolute; top: 0; left: 0; width: 200%; height: 100%; visibility: hidden; }
+.sheet .sv .r .ink { left: -100%; }
+.sheet.written .ink { visibility: visible; }
+.sheet .ink path, .sheet .pen path { fill: none; stroke: var(--ink); stroke-width: 10; stroke-linecap: round; stroke-linejoin: round; filter: url(#ink-rough); }
+.sheet .pen { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; transition: opacity 240ms; z-index: 2; }
+.sheet .pen.lift { opacity: 0; }
+.pen .brush { visibility: hidden; }
+.pen.writing .brush { visibility: visible; }
+.pen .handle { fill: #b07b3e; stroke: #6e4a1e; stroke-width: 1; }
+.pen .ferrule { fill: #4e3216; }
+.pen .tip { fill: #151011; }
+.sheet.hide { opacity: 0; }
+.stage.prep .tablet, .stage.prep .urn, .stage.prep .block, .stage.prep .stage-caption { opacity: 0; }
+.tablet, .urn, .block, .stage-caption { transition: opacity 400ms; }
+.sheet.big .fc { box-shadow: 0 14px 28px rgba(0, 0, 0, 0.5); }
+
+.block { position: absolute; left: 0; top: 0; width: 54px; height: 76px; will-change: transform; pointer-events: none; }
+.block svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 6px 5px rgba(0, 0, 0, 0.55)); }
+.block .flat, .block .round { display: none; }
+.block.show-flat .flat, .block.show-round .round { display: inline; }
+.block.spin .flat { display: inline; animation: flip 150ms steps(1) infinite; }
+.block.spin .round { display: inline; animation: flip 150ms steps(1) infinite reverse; }
+@keyframes flip { 0% { opacity: 1; } 50% { opacity: 0; } }
+
+.verdict {
+  position: absolute; left: 0; right: 0; top: 7%;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  text-align: center;
+  pointer-events: none;
+}
+.verdict-cn { font-family: var(--font-brush); font-size: 4.25rem; line-height: 1; text-shadow: 0 4px 18px rgba(0, 0, 0, 0.7); }
+.verdict-en { font-family: var(--font-cond); font-weight: 600; font-size: 1.0625rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.verdict[data-kind="sheng"] { color: var(--yes); }
+.verdict[data-kind="xiao"] { color: var(--laugh); }
+.verdict[data-kind="yin"] { color: var(--no); }
+.verdict.show { animation: verdict 480ms cubic-bezier(.2, 1.2, .4, 1) both; }
+@keyframes verdict { 0% { transform: scale(1.4); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+.streak { display: flex; gap: 6px; justify-content: center; margin-top: 4px; }
+.streak i { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--gold); }
+.streak i.on { background: var(--gold); }
+
+
+/* ---------- Step panel ---------- */
+.panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.panel h2 { font-family: var(--font-cond); font-weight: 700; font-size: var(--step-2); line-height: 1.1; letter-spacing: 0.01em; }
+.panel h2 .brush { color: var(--gold); font-size: 1.1em; margin-right: 6px; }
+.panel p { color: var(--muted); }
+.panel p strong { color: var(--text); font-weight: 600; }
+.meter { display: flex; gap: 8px; align-items: center; font-family: var(--font-cond); color: var(--muted); font-size: 0.9375rem; letter-spacing: 0.04em; }
+.meter i { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--gold-soft); }
+.meter i.on { background: var(--gold); border-color: var(--gold); }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn {
+  min-height: 48px; padding: 10px 18px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--wood-2);
+  font-family: var(--font-cond); font-weight: 600; font-size: 1.0625rem; letter-spacing: 0.06em;
+  color: var(--text);
+}
+.btn .brush { font-size: 1.35em; line-height: 1; color: var(--gold); }
+.btn-primary {
+  border: none;
+  background: linear-gradient(180deg, #c93a2c, var(--lacquer) 55%, #8c1d15);
+  color: #fff3dc;
+  box-shadow: inset 0 0 0 1px rgba(255, 220, 160, 0.35), 0 6px 16px rgba(94, 18, 13, 0.6);
+}
+.btn-primary .brush { color: #ffe3a3; }
+.btn-big { flex: 1 1 100%; min-height: 60px; font-size: 1.25rem; }
+.btn:active { transform: translateY(1px); }
+.btn[disabled], .btn[aria-disabled="true"] { opacity: 0.45; cursor: default; }
+.btn-quiet { background: transparent; border-color: var(--line); color: var(--muted); }
+.mode-note { font-size: var(--step--1); color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.linklike { display: inline-flex; align-items: center; min-height: 44px; padding: 0 6px; margin-inline: -6px; border: 0; background: none; color: var(--gold); text-decoration: underline; text-underline-offset: 3px; font-size: inherit; }
+
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+legend { padding: 0; margin-bottom: 8px; font-family: var(--font-cond); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.8125rem; color: var(--gold-soft); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { position: relative; }
+.chip input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.chip span {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  min-height: 40px; padding: 8px 14px;
+  border-radius: 999px; border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.2);
+  font-size: 0.9375rem; color: var(--muted);
+}
+.chip span b { font-family: var(--font-brush); font-weight: 400; font-size: 1.15rem; color: var(--text); }
+.chip input:checked + span { border-color: var(--gold); background: rgba(226, 179, 85, 0.14); color: var(--text); }
+.chip input:focus-visible + span { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.prayer {
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(176, 40, 29, 0.22), rgba(94, 18, 13, 0.22));
+  border: 1px solid rgba(176, 40, 29, 0.6);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.prayer .cn { font-family: var(--font-brush); font-size: 1.3rem; line-height: 1.5; color: var(--text); text-wrap: pretty; }
+.prayer .en { font-size: var(--step--1); color: var(--muted); font-style: italic; }
+.prayer.compact { padding: 10px 14px; }
+.prayer.compact .cn { font-size: 1.15rem; }
+.check { display: flex; align-items: center; gap: 10px; min-height: 44px; color: var(--text); cursor: pointer; }
+.check input { width: 22px; height: 22px; accent-color: var(--lacquer); margin: 0; }
+.news { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.news li { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; }
+.news li > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.news p { color: var(--text); }
+.story .small strong { color: var(--text); }
+.fineprint { font-size: var(--step--1); color: var(--muted); text-align: center; padding-inline: 8px; }
+
+/* ---------- Final number ---------- */
+.final { display: flex; flex-direction: column; gap: 14px; }
+.final-number { display: flex; gap: 8px; justify-content: center; }
+.final-number span {
+  width: 22%; max-width: 84px; aspect-ratio: 0.82;
+  display: grid; place-items: center;
+  border-radius: 10px;
+  background: radial-gradient(120% 120% at 30% 15%, #cf3e2f, var(--lacquer) 45%, var(--lacquer-deep));
+  color: var(--gold);
+  font-family: var(--font-cond); font-weight: 700; font-size: clamp(2.6rem, 13vw, 3.6rem); line-height: 1;
+  box-shadow: inset 0 0 0 2px rgba(255, 220, 160, 0.2), 0 8px 20px rgba(0, 0, 0, 0.45);
+}
+.ritual-log { display: grid; gap: 6px; font-size: var(--step--1); color: var(--muted); }
+.ritual-log li { display: flex; gap: 10px; align-items: baseline; }
+.ritual-log b { font-family: var(--font-cond); font-size: 1.125rem; color: var(--text); min-width: 1.2em; }
+.ritual-log ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+
+/* ---------- Cards, history ---------- */
+.card {
+  padding: 16px;
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(58, 33, 24, 0.55), rgba(38, 21, 15, 0.55));
+  border: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 12px;
+  min-width: 0;
+}
+.num { font-family: var(--font-cond); font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+.num-xl { font-family: var(--font-cond); font-weight: 700; font-size: 3rem; line-height: 1; color: var(--gold); letter-spacing: 0.06em; font-variant-numeric: tabular-nums; }
+.headline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.headline p { color: var(--text); font-size: var(--step-1); font-family: var(--font-cond); font-weight: 500; }
+.muted { color: var(--muted); }
+.small { font-size: var(--step--1); }
+.tiers { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 0; }
+.tiers div { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px; border-radius: 8px; background: rgba(0, 0, 0, 0.22); }
+.tiers dt { font-family: var(--font-cond); font-size: 0.75rem; letter-spacing: 0.06em; color: var(--muted); text-transform: uppercase; }
+.tiers dd { margin: 0; font-family: var(--font-cond); font-weight: 700; font-size: 1.375rem; font-variant-numeric: tabular-nums; }
+.tiers .t1 dd { color: var(--gold); }
+.strip { width: 100%; height: auto; display: block; }
+.strip text { fill: var(--muted); font: 600 9px var(--font-cond); letter-spacing: 0.04em; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.75rem; color: var(--muted); font-family: var(--font-cond); letter-spacing: 0.04em; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.perm-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.perm {
+  display: inline-flex; gap: 6px; align-items: baseline;
+  padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: rgba(0, 0, 0, 0.2);
+  font-family: var(--font-cond); font-size: 1rem; letter-spacing: 0.06em; color: var(--text);
+}
+.perm small { color: var(--muted); font-size: 0.8125rem; letter-spacing: 0; }
+.perm.self { border-color: var(--gold); }
+.perm.zero { color: var(--muted); }
+.table-wrap { overflow-x: auto; max-height: 340px; overflow-y: auto; border-radius: 8px; border: 1px solid var(--line); }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid rgba(226, 179, 85, 0.1); white-space: nowrap; }
+th { position: sticky; top: 0; background: var(--wood-2); font-family: var(--font-cond); font-weight: 600; font-size: 0.8125rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+td { font-size: 0.9375rem; }
+.tier-pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-family: var(--font-cond); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.04em; }
+.tp-1 { background: var(--gold); color: var(--ink); }
+.tp-2, .tp-3 { background: var(--copper); color: var(--ink); }
+.tp-S { background: rgba(241, 213, 127, 0.18); color: var(--paper); }
+.tp-C { background: rgba(181, 162, 145, 0.18); color: var(--muted); }
+.tp-X { background: rgba(181, 162, 145, 0.12); color: var(--muted); }
+
+.lookup-form { display: flex; gap: 10px; align-items: stretch; }
+.lookup-form input {
+  flex: 1; min-width: 0;
+  min-height: 52px; padding: 0 14px;
+  border-radius: 12px; border: 1px solid var(--line-strong);
+  background: rgba(0, 0, 0, 0.3);
+  font-family: var(--font-cond); font-weight: 700; font-size: 1.75rem; letter-spacing: 0.3em;
+  color: var(--gold);
+}
+.lookup-form input::placeholder { color: rgba(181, 162, 145, 0.75); }
+.field-label { font-family: var(--font-cond); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.8125rem; color: var(--gold-soft); }
+.field-error { color: var(--no); font-size: var(--step--1); }
+
+.draw-nav { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.draw-nav .btn { min-height: 44px; padding: 8px 14px; }
+.draw-nav input[type="date"], .draw-nav input[type="number"] {
+  min-height: 44px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line-strong); background: rgba(0, 0, 0, 0.3); font-family: var(--font-cond); font-size: 1.0625rem; min-width: 0;
+}
+.draw-nav input[type="number"] { width: 6.5em; }
+.top3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.top3 button {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 10px 4px; border-radius: 10px; border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.22);
+}
+.top3 button:first-child { border-color: var(--gold); background: rgba(226, 179, 85, 0.1); }
+.top3 small { font-family: var(--font-cond); font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.top3 .num { font-size: 1.75rem; color: var(--gold); line-height: 1.1; }
+.grid5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.grid5 button { padding: 6px 0; border-radius: 8px; border: 1px solid transparent; background: rgba(0, 0, 0, 0.18); font-family: var(--font-cond); font-weight: 600; font-size: 1.0625rem; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+.grid5 button:hover, .top3 button:hover { border-color: var(--line-strong); }
+.mark { outline: 2px solid var(--gold); }
+
+.heat { display: grid; grid-template-columns: auto repeat(10, 1fr); gap: 3px; font-family: var(--font-cond); font-variant-numeric: tabular-nums; }
+.heat .h { font-size: 0.75rem; color: var(--muted); text-align: center; letter-spacing: 0.04em; padding-bottom: 2px; }
+.heat .r { font-size: 0.75rem; color: var(--muted); padding-right: 6px; align-self: center; white-space: nowrap; letter-spacing: 0.04em; }
+.heat .c { padding: 7px 0; text-align: center; border-radius: 4px; font-size: 0.8125rem; font-weight: 600; color: var(--text); }
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 999px; overflow: hidden; flex-wrap: wrap; }
+.seg button { border: 0; background: transparent; padding: 8px 14px; min-height: 40px; font-family: var(--font-cond); font-weight: 600; letter-spacing: 0.04em; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: rgba(226, 179, 85, 0.18); color: var(--text); }
+.seg button:focus-visible { outline-offset: -3px; }
+
+.journal-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.jentry { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: center; }
+.jentry .num-xl { font-size: 2.25rem; }
+.jentry .meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.jentry .meta b { font-family: var(--font-cond); font-weight: 600; letter-spacing: 0.02em; }
+.jentry .actions { grid-column: 1 / -1; }
+.jentry .btn { min-height: 40px; padding: 6px 14px; font-size: 0.9375rem; }
+.empty { text-align: center; padding: 28px 16px; color: var(--muted); display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.empty .brush { font-size: 3rem; color: var(--gold-soft); line-height: 1; }
+
+.about h2 { font-family: var(--font-cond); font-weight: 600; font-size: var(--step-1); }
+.about p, .about li { color: var(--muted); max-width: 62ch; }
+.about strong { color: var(--text); font-weight: 600; }
+.about ol, .about ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+.outcomes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.outcomes figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px; border-radius: 10px; background: rgba(0, 0, 0, 0.22); text-align: center; }
+.outcomes svg { width: 72px; height: 54px; overflow: visible; }
+.outcomes .brush { font-size: 1.6rem; line-height: 1; }
+.outcomes figcaption { font-size: 0.75rem; color: var(--muted); font-family: var(--font-cond); letter-spacing: 0.04em; }
+.helpline { font-family: var(--font-cond); font-size: 1.375rem; font-weight: 700; letter-spacing: 0.06em; color: var(--text); user-select: all; }
+
+/* ---------- Tab rail ---------- */
+.rail {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  padding: 6px max(16px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  background: linear-gradient(180deg, #4a0f0a, #2b0806);
+  border-top: 1px solid var(--gold-soft);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
+}
+.rail-inner { max-width: 30rem; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.rail a {
+  display: flex; flex-direction: column; align-items: center; gap: 0;
+  min-height: 52px; justify-content: center;
+  border-radius: 10px;
+  text-decoration: none; color: rgba(241, 230, 214, 0.65);
+  font-family: var(--font-cond); font-weight: 600; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.rail a .brush { font-size: 1.5rem; line-height: 1.1; letter-spacing: 0; text-transform: none; }
+.rail a[aria-current="page"] { color: var(--gold); background: rgba(226, 179, 85, 0.1); }
+
+.toast {
+  position: fixed; left: 50%; z-index: 30;
+  bottom: calc(var(--rail-h) + 20px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  padding: 10px 16px; border-radius: 999px;
+  background: var(--wood-3); border: 1px solid var(--line-strong); color: var(--text);
+  font-family: var(--font-cond); font-weight: 600; letter-spacing: 0.04em;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-sizing: border-box; width: max-content; max-width: calc(100vw - 32px);
+  border-radius: 14px; text-align: center;
+}
+
+@media (max-width: 360px) {
+  .plaque-en { display: none; }
+  .tiers { grid-template-columns: repeat(3, 1fr); }
+  .verdict-cn { font-size: 3.5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="g-flat" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f4b49c"/>
+      <stop offset="0.55" stop-color="#e99a84"/>
+      <stop offset="1" stop-color="#d27c69"/>
+    </linearGradient>
+    <radialGradient id="g-round" cx="0.42" cy="0.38" r="0.75">
+      <stop offset="0" stop-color="#f3a68f"/>
+      <stop offset="0.35" stop-color="#cf5a45"/>
+      <stop offset="0.8" stop-color="#8e2a1d"/>
+      <stop offset="1" stop-color="#5e1810"/>
+    </radialGradient>
+    <linearGradient id="g-palm" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4a2c1c"/>
+      <stop offset="0.6" stop-color="#2f1b12"/>
+      <stop offset="1" stop-color="#22130c"/>
+    </linearGradient>
+    <linearGradient id="g-brass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e9c26a"/>
+      <stop offset="0.5" stop-color="#b8872f"/>
+      <stop offset="1" stop-color="#6d4a17"/>
+    </linearGradient>
+    <filter id="ink-rough" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="3" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>
+    <clipPath id="c-block"><path d="M30 4 C 102 10, 112 130, 32 146 C 41 110, 41 40, 30 4 Z"/></clipPath>
+    <symbol id="mb-flat" viewBox="0 0 110 150">
+      <g>
+        <path d="M30 4 C 102 10, 112 130, 32 146 C 41 110, 41 40, 30 4 Z" fill="url(#g-flat)" stroke="#a9563f" stroke-width="1.5"/>
+        <g clip-path="url(#c-block)" fill="none" stroke="#c97561" stroke-width="1.1" opacity="0.75">
+          <path d="M42 10 C 56 40, 56 110, 42 140"/>
+          <path d="M52 14 C 70 44, 70 106, 52 136"/>
+          <path d="M63 20 C 84 50, 84 100, 63 130"/>
+          <path d="M74 28 C 96 58, 96 94, 74 122"/>
+          <path d="M86 40 C 104 66, 104 88, 86 110"/>
+        </g>
+      </g>
+    </symbol>
+    <symbol id="mb-round" viewBox="0 0 110 150">
+      <g>
+        <path d="M30 4 C 102 10, 112 130, 32 146 C 41 110, 41 40, 30 4 Z" fill="url(#g-round)" stroke="#4d140d" stroke-width="1.5"/>
+        <path d="M50 20 C 78 34, 90 64, 86 90" fill="none" stroke="rgba(255,226,210,0.7)" stroke-width="5" stroke-linecap="round"/>
+        <ellipse cx="64" cy="44" rx="7" ry="12" fill="rgba(255,240,230,0.5)" transform="rotate(-25 64 44)"/>
+      </g>
+    </symbol>
+  </defs>
+</svg>
+
+<div id="app">
+  <header class="plaque">
+    <div class="plaque-board" role="img" aria-label="Heng Ong Huat">
+      <span class="plaque-cn" lang="zh-Hans">兴旺发</span>
+      <span class="plaque-en">Heng Ong Huat</span>
+    </div>
+    <button id="soundBtn" class="icon-btn" type="button" aria-pressed="true" aria-label="Sound">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+    </button>
+  </header>
+
+  <main>
+    <!-- ================= SEEK ================= -->
+    <section id="seek" class="view" aria-label="Seek your number">
+      <p class="next-draw" id="nextDraw"></p>
+
+      <div class="slots" id="slots" aria-label="Your number so far"></div>
+
+      <div class="stage" id="stage">
+        <canvas id="smoke" aria-hidden="true"></canvas>
+        <div class="tablet" id="tablet" lang="zh-Hans" aria-hidden="true">历代祖先</div>
+        <p class="stage-caption" aria-hidden="true"><b id="poolCount">10 slips</b>0 to 9 in the pool</p>
+
+        <svg class="urn" viewBox="0 0 64 92" aria-hidden="true">
+          <g stroke-linecap="round">
+            <line x1="24" y1="44" x2="20" y2="4" stroke="#9c4a26" stroke-width="2.2"/>
+            <line x1="32" y1="44" x2="32" y2="0" stroke="#9c4a26" stroke-width="2.2"/>
+            <line x1="40" y1="44" x2="44" y2="4" stroke="#9c4a26" stroke-width="2.2"/>
+            <circle cx="20" cy="4" r="2.2" fill="#ff8a3d"/>
+            <circle cx="32" cy="0.5" r="2.2" fill="#ff8a3d"/>
+            <circle cx="44" cy="4" r="2.2" fill="#ff8a3d"/>
+          </g>
+          <path d="M6 46 h52 c0 22 -8 34 -26 34 s-26 -12 -26 -34z" fill="url(#g-brass)"/>
+          <rect x="4" y="42" width="56" height="6" rx="3" fill="#e9c26a"/>
+          <path d="M14 80 l-4 10 M50 80 l4 10 M32 82 v8" stroke="#8a6224" stroke-width="3" stroke-linecap="round"/>
+          <text x="32" y="68" text-anchor="middle" font-family="Ma Shan Zheng, KaiTi, serif" font-size="14" fill="#5a3a10">福</text>
+        </svg>
+
+        <svg class="hands" id="hands" viewBox="0 0 240 320" aria-hidden="true">
+          <defs>
+            <linearGradient id="hh-sk" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b9785a"/><stop offset="0.3" stop-color="#e2ab88"/><stop offset="0.55" stop-color="#f0c4a3"/><stop offset="1" stop-color="#c88866"/></linearGradient>
+            <linearGradient id="hh-skD" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e9b896"/><stop offset="0.55" stop-color="#dfa783"/><stop offset="1" stop-color="#c58a68"/></linearGradient>
+            <radialGradient id="hh-dome" cx="0.42" cy="0.35" r="0.7"><stop offset="0" stop-color="#f3cbab"/><stop offset="0.55" stop-color="#e2aa86"/><stop offset="1" stop-color="#b87656"/></radialGradient>
+            <linearGradient id="hh-far" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9f6246"/><stop offset="1" stop-color="#c9906d"/></linearGradient>
+            <linearGradient id="hh-thumb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d89c78"/><stop offset="0.45" stop-color="#f2c8a8"/><stop offset="1" stop-color="#c07f5f"/></linearGradient>
+            <linearGradient id="hh-nail" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbe9df"/><stop offset="0.7" stop-color="#efc6b4"/><stop offset="1" stop-color="#e2ad97"/></linearGradient>
+            <linearGradient id="hh-sleeve" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a2016"/><stop offset="1" stop-color="#4a0e09"/></linearGradient>
+            <filter id="hh-b1" filterUnits="userSpaceOnUse" x="0" y="0" width="240" height="320"><feGaussianBlur stdDeviation="1.2"/></filter>
+            <filter id="hh-b3" filterUnits="userSpaceOnUse" x="0" y="0" width="240" height="320"><feGaussianBlur stdDeviation="3"/></filter>
+            <filter id="hh-tex" filterUnits="userSpaceOnUse" x="0" y="0" width="240" height="320"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="4" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 0.45  0 0 0 0 0.25  0 0 0 0 0.16  0 0 0 0.55 -0.12"/></filter>
+            <filter id="hh-b6" filterUnits="userSpaceOnUse" x="0" y="0" width="240" height="320"><feGaussianBlur stdDeviation="6"/></filter>
+          </defs>
+          
+          <g>
+          <path d="M 135.5 148.3 L 136.1 43.3 C 136.3 37.6, 133.0 32.7, 127.3 32.5 C 121.6 32.4, 118.0 37.1, 117.9 42.7 L 112.5 147.7 Z" fill="url(#hh-far)"/>
+          <ellipse cx="129.0" cy="47.0" rx="4.6" ry="8.0" fill="#d9a28c" opacity="0.55"/>
+          <path d="M 160.0 145.6 L 154.1 28.7 C 153.9 22.8, 150.1 17.8, 144.2 18.0 C 138.2 18.1, 134.7 23.3, 134.9 29.3 L 136.0 146.4 Z" fill="url(#hh-far)"/>
+          <ellipse cx="146.5" cy="33.0" rx="4.8" ry="8.4" fill="#d9a28c" opacity="0.55"/>
+          <path d="M 181.5 151.0 L 170.1 44.2 C 169.6 38.6, 165.8 34.1, 160.1 34.5 C 154.5 35.0, 151.4 40.1, 151.9 45.8 L 158.5 153.0 Z" fill="url(#hh-far)"/>
+          <ellipse cx="163.0" cy="49.0" rx="4.6" ry="8.0" fill="#d9a28c" opacity="0.55"/>
+          <path d="M 156 156 C 178 166, 194 204, 190 240 C 186 264, 174 282, 166 298 L 124 298 Z" fill="url(#hh-far)"/>
+          <path d="M 160 246 C 176 236, 186 210, 190 180 C 193 160, 193 146, 189 138 C 185 130, 174 131, 171 142 C 166 164, 160 196, 150 222 Z" fill="#b97b5b"/>
+          <g transform="translate(182 146) rotate(14)"><rect x="-6" y="-8" width="11" height="16" rx="5.5" fill="#dcae9a" opacity="0.8"/></g>
+          </g>
+          <g class="peek"><path d="M 150 236 l 18 -5 l 5 16 l -18 5 z" fill="#f1d57f" stroke="#d8b55b" stroke-width="0.8"/><path d="M 159 233 l 5 16" stroke="#c9a24c" stroke-width="0.7"/></g>
+          <path d="M 70 276 C 96 266, 170 266, 190 276 L 202 320 L 58 320 Z" fill="url(#hh-sleeve)"/>
+          <path d="M 70 276 C 96 266, 170 266, 190 276" fill="none" stroke="#d2a24a" stroke-width="2.2"/>
+          <path d="M 88 236 C 86 252, 86 266, 88 280 L 156 280 C 160 266, 162 252, 160 236 Z" fill="url(#hh-skD)"/>
+          <path d="M 76.0 156.0 L 93.8 81.1 L 111.1 53.4 L 128.5 41.6 L 144.8 55.8 L 161.0 152.0 Z" fill="#a96a4c"/>
+          <path d="M 94.9 151.6 L 104.4 67.2 C 105.2 62.0, 102.6 57.1, 97.4 56.3 C 92.2 55.6, 88.3 59.6, 87.6 64.8 L 73.1 148.4 Z" fill="url(#hh-sk)"/>
+          <path d="M 119.0 142.6 L 121.5 34.4 C 121.8 28.6, 118.4 23.4, 112.5 23.1 C 106.6 22.8, 102.8 27.7, 102.5 33.6 L 95.0 141.4 Z" fill="url(#hh-sk)"/>
+          <path d="M 143.5 139.7 L 138.0 19.8 C 137.8 13.6, 133.9 8.3, 127.7 8.5 C 121.5 8.7, 117.8 14.1, 118.0 20.2 L 118.5 140.3 Z" fill="url(#hh-sk)"/>
+          <path d="M 165.0 144.9 L 152.5 35.1 C 151.9 29.3, 147.9 24.6, 142.0 25.1 C 136.1 25.7, 133.0 31.0, 133.5 36.9 L 141.0 147.1 Z" fill="url(#hh-sk)"/>
+          <clipPath id="hh-near"><path d="M 70 162 Q 73 145 84 146 Q 92 147 96 153 Q 96 137 107 138 Q 115 139 119 145 Q 120 135 131 136 Q 139 137 142 149 Q 142 141 153 142 Q 165 144 168 158 C 172 186, 170 226, 158 246 C 140 266, 96 262, 86 240 C 74 210, 68 182, 70 162 Z"/><path d="M 94.9 151.6 L 104.4 67.2 C 105.2 62.0, 102.6 57.1, 97.4 56.3 C 92.2 55.6, 88.3 59.6, 87.6 64.8 L 73.1 148.4 Z"/><path d="M 119.0 142.6 L 121.5 34.4 C 121.8 28.6, 118.4 23.4, 112.5 23.1 C 106.6 22.8, 102.8 27.7, 102.5 33.6 L 95.0 141.4 Z"/><path d="M 143.5 139.7 L 138.0 19.8 C 137.8 13.6, 133.9 8.3, 127.7 8.5 C 121.5 8.7, 117.8 14.1, 118.0 20.2 L 118.5 140.3 Z"/><path d="M 165.0 144.9 L 152.5 35.1 C 151.9 29.3, 147.9 24.6, 142.0 25.1 C 136.1 25.7, 133.0 31.0, 133.5 36.9 L 141.0 147.1 Z"/></clipPath>
+          <path d="M 70 162 Q 73 145 84 146 Q 92 147 96 153 Q 96 137 107 138 Q 115 139 119 145 Q 120 135 131 136 Q 139 137 142 149 Q 142 141 153 142 Q 165 144 168 158 C 172 186, 170 226, 158 246 C 140 266, 96 262, 86 240 C 74 210, 68 182, 70 162 Z" fill="url(#hh-dome)"/>
+          <g fill="#f7d8be" opacity="0.55" filter="url(#hh-b3)">
+          <ellipse cx="82" cy="152" rx="7.0" ry="6"/>
+          <ellipse cx="105" cy="144" rx="7.7" ry="6"/>
+          <ellipse cx="129" cy="142" rx="8.0" ry="6"/>
+          <ellipse cx="151" cy="148" rx="7.7" ry="6"/>
+          </g>
+          <g clip-path="url(#hh-near)" fill="none" stroke="#c48563" stroke-width="7" opacity="0.18" stroke-linecap="round" filter="url(#hh-b3)">
+          <path d="M 84 160 C 83 190, 102 216, 120 236"/>
+          <path d="M 107 152 C 106 182, 114 208, 120 228"/>
+          <path d="M 131 150 C 130 180, 126 206, 120 226"/>
+          <path d="M 153 156 C 152 186, 136 212, 120 232"/>
+          </g>
+          <path d="M 95.1 115.6 Q 88.7 116.9 82.9 113.8" fill="none" stroke="#a5664a" stroke-width="1" opacity="0.75" stroke-linecap="round"/>
+          <path d="M 94.5 115.5 Q 88.3 119.7 83.5 113.9" fill="none" stroke="#a5664a" stroke-width="0.8" opacity="0.45" stroke-linecap="round"/>
+          <path d="M 97.4 88.5 Q 92.6 90.0 88.4 87.2" fill="none" stroke="#a5664a" stroke-width="1" opacity="0.75" stroke-linecap="round"/>
+          <path d="M 97.0 88.4 Q 92.2 92.8 88.8 87.3" fill="none" stroke="#a5664a" stroke-width="0.8" opacity="0.45" stroke-linecap="round"/>
+          <g transform="translate(95.2 71.9) rotate(8.1)"><rect x="-5.3" y="-8.1" width="10.5" height="16.1" rx="5.3" fill="url(#hh-nail)" stroke="#d29a84" stroke-width="0.7"/><path d="M -3.8 5.1 Q 0 2.6 3.8 5.1" fill="none" stroke="#fff6f0" stroke-width="0.9" opacity="0.8"/></g>
+          <path d="M 115.9 97.0 Q 109.0 98.8 102.3 96.3" fill="none" stroke="#a5664a" stroke-width="1" opacity="0.75" stroke-linecap="round"/>
+          <path d="M 115.2 96.9 Q 108.9 101.6 103.0 96.4" fill="none" stroke="#a5664a" stroke-width="0.8" opacity="0.45" stroke-linecap="round"/>
+          <path d="M 115.8 62.3 Q 110.6 64.3 105.6 61.8" fill="none" stroke="#a5664a" stroke-width="1" opacity="0.75" stroke-linecap="round"/>
+          <path d="M 115.3 62.3 Q 110.5 67.1 106.1 61.9" fill="none" stroke="#a5664a" stroke-width="0.8" opacity="0.45" stroke-linecap="round"/>
+          <g transform="translate(111.7 41.6) rotate(2.7)"><rect x="-5.9" y="-9.0" width="11.8" height="18.1" rx="5.9" fill="url(#hh-nail)" stroke="#d29a84" stroke-width="0.7"/><path d="M -4.4 6.0 Q 0 3.5 4.4 6.0" fill="none" stroke="#fff6f0" stroke-width="0.9" opacity="0.8"/></g>
+          <path d="M 136.8 89.4 Q 129.8 91.8 122.6 89.8" fill="none" stroke="#a5664a" stroke-width="1" opacity="0.75" stroke-linecap="round"/>
+          <path d="M 136.1 89.4 Q 129.9 94.6 123.4 89.8" fill="none" stroke="#a5664a" stroke-width="0.8" opacity="0.45" stroke-linecap="round"/>
+          <path d="M 134.1 51.1 Q 128.8 53.4 123.5 51.3" fill="none" stroke="#a5664a" stroke-width="1" opacity="0.75" stroke-linecap="round"/>
+          <path d="M 133.6 51.1 Q 128.9 56.2 124.0 51.3" fill="none" stroke="#a5664a" stroke-width="0.8" opacity="0.45" stroke-linecap="round"/>
+          <g transform="translate(128.2 28.4) rotate(-1.4)"><rect x="-6.2" y="-9.5" width="12.4" height="19.0" rx="6.2" fill="url(#hh-nail)" stroke="#d29a84" stroke-width="0.7"/><path d="M -4.7 6.5 Q 0 4.0 4.7 6.5" fill="none" stroke="#fff6f0" stroke-width="0.9" opacity="0.8"/></g>
+          <path d="M 155.6 99.2 Q 149.0 102.0 142.0 100.4" fill="none" stroke="#a5664a" stroke-width="1" opacity="0.75" stroke-linecap="round"/>
+          <path d="M 154.9 99.2 Q 149.3 104.8 142.7 100.4" fill="none" stroke="#a5664a" stroke-width="0.8" opacity="0.45" stroke-linecap="round"/>
+          <path d="M 150.7 64.1 Q 145.8 66.8 140.5 65.1" fill="none" stroke="#a5664a" stroke-width="1" opacity="0.75" stroke-linecap="round"/>
+          <path d="M 150.1 64.2 Q 146.1 69.6 141.1 65.0" fill="none" stroke="#a5664a" stroke-width="0.8" opacity="0.45" stroke-linecap="round"/>
+          <g transform="translate(143.7 43.7) rotate(-5.2)"><rect x="-5.9" y="-9.0" width="11.8" height="18.1" rx="5.9" fill="url(#hh-nail)" stroke="#d29a84" stroke-width="0.7"/><path d="M -4.4 6.0 Q 0 3.5 4.4 6.0" fill="none" stroke="#fff6f0" stroke-width="0.9" opacity="0.8"/></g>
+          <g stroke="#7a4630" stroke-width="2.2" opacity="0.55" fill="none" stroke-linecap="round" filter="url(#hh-b1)">
+          <path d="M 95.5 138.0 L 104.0 66.0"/>
+          <path d="M 119.0 133.0 L 120.0 43.0"/>
+          <path d="M 142.0 135.0 L 135.5 44.0"/>
+          </g>
+          <path d="M 150 250 C 164 240, 172 214, 176 184 C 179 162, 180 146, 176 136 C 172 126, 160 126, 157 138 C 152 160, 146 192, 136 222 Z" fill="url(#hh-thumb)"/>
+          <g transform="translate(168 142) rotate(12)"><rect x="-7" y="-9" width="13" height="18" rx="6.5" fill="url(#hh-nail)" stroke="#d29a84" stroke-width="0.7"/></g>
+          <path d="M 158 186 C 164 190, 170 190, 175 186" fill="none" stroke="#a5664a" stroke-width="1" opacity="0.7"/>
+          <g clip-path="url(#hh-near)">
+          <path d="M 60 146 C 100 140, 140 138, 176 146" fill="none" stroke="#e8b893" stroke-width="12" opacity="0.55" filter="url(#hh-b3)"/>
+          <rect width="240" height="320" filter="url(#hh-tex)" opacity="0.5"/>
+          <path d="M 70 40 C 66 120, 70 200, 96 262" fill="none" stroke="#5a2b1a" stroke-width="22" opacity="0.38" filter="url(#hh-b6)"/>
+          <path d="M 112 150 C 104 180, 104 214, 112 244" fill="none" stroke="#fbe2cc" stroke-width="26" opacity="0.22" filter="url(#hh-b6)"/>
+          </g>
+          </svg>
+
+        <button class="slip" id="slip" type="button" aria-label="Unfold the slip" hidden></button>
+        <div class="block" id="blockL"><svg viewBox="0 0 110 150" aria-hidden="true"><use class="flat" href="#mb-flat"/><use class="round" href="#mb-round"/></svg></div>
+        <div class="block" id="blockR"><svg viewBox="0 0 110 150" aria-hidden="true" style="transform:scaleX(-1)"><use class="flat" href="#mb-flat"/><use class="round" href="#mb-round"/></svg></div>
+        <div class="verdict" id="verdict" hidden>
+          <span class="verdict-cn" id="verdictCn" lang="zh-Hans">圣杯</span>
+          <span class="verdict-en" id="verdictEn">Yes</span>
+          <span class="streak" id="streak"></span>
+        </div>
+      </div>
+
+      <div class="panel" id="panel"></div>
+      <p class="visually-hidden" id="live" aria-live="polite"></p>
+    </section>
+
+    <!-- ================= HISTORY ================= -->
+    <section id="history" class="view" hidden aria-labelledby="historyTitle">
+      <h1 class="view-title" id="historyTitle"><span class="brush" lang="zh-Hans">史</span>Winning history</h1>
+      <p class="lede" id="historyLede"></p>
+
+      <form class="card" id="lookupForm" novalidate>
+        <label class="field-label" for="lookupInput">Look up any 4D number</label>
+        <p class="small muted">Your divine number, a dream number from your 千字图 book, a car plate or a date.</p>
+        <div class="lookup-form">
+          <input id="lookupInput" name="lookup" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="0000" aria-describedby="lookupError">
+          <button class="btn btn-primary" type="submit">Look up</button>
+        </div>
+        <p class="field-error" id="lookupError" role="alert" hidden></p>
+      </form>
+      <div id="lookupResult"></div>
+
+      <div class="card" id="drawCard">
+        <h2 class="section-title"><span class="brush" lang="zh-Hans">开</span>Draw results</h2>
+        <div class="draw-nav">
+          <button class="btn" type="button" id="prevDraw" aria-label="Previous draw">‹ Prev</button>
+          <label class="visually-hidden" for="drawNo">Draw number</label>
+          <input type="number" id="drawNo" min="1" step="1" inputmode="numeric">
+          <button class="btn" type="button" id="nextDrawBtn" aria-label="Next draw">Next ›</button>
+          <button class="btn btn-quiet" type="button" id="latestDraw">Latest</button>
+        </div>
+        <div id="drawBody"></div>
+      </div>
+
+      <div class="card" id="datesCard">
+        <h2 class="section-title"><span class="brush" lang="zh-Hans">念</span>Dates that matter</h2>
+        <p class="small muted">An ancestor’s birthday or death anniversary, a wedding, a child’s birth. See the 1st prizes drawn on that date over the years.</p>
+        <div class="draw-nav"><label class="field-label" for="memDate">Date</label><input type="date" id="memDate"></div>
+        <div id="memBody" class="panel"></div>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title"><span class="brush" lang="zh-Hans">闻</span>Altar numbers in the news</h2>
+        <p class="small muted">Numbers from altars that made the news, checked against the record. Stories get told when an altar number wins; the many that did not win are never reported.</p>
+        <ul class="news" id="newsList"></ul>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title"><span class="brush" lang="zh-Hans">数</span>Digits in past winning numbers</h2>
+        <p class="small muted">How often each digit appeared in each place of a winning number. In a fair draw every cell sits near 10%. These are past results; they do not change the odds of the next draw.</p>
+        <div class="seg" role="group" aria-label="Which prizes to count" id="heatFilter">
+          <button type="button" data-f="all" aria-pressed="true">All 23 prizes</button>
+          <button type="button" data-f="top" aria-pressed="false">Top 3</button>
+          <button type="button" data-f="first" aria-pressed="false">1st only</button>
+        </div>
+        <div class="table-wrap" style="max-height:none;border:0"><div class="heat" id="heat"></div></div>
+        <p class="small muted" id="heatNote"></p>
+      </div>
+      <p class="fineprint">Not affiliated with Singapore Pools. Every draw is independent; past results do not predict future ones.</p>
+    </section>
+
+    <!-- ================= JOURNAL ================= -->
+    <section id="journal" class="view" hidden aria-labelledby="journalTitle">
+      <h1 class="view-title" id="journalTitle"><span class="brush" lang="zh-Hans">录</span>Blessing journal</h1>
+      <p class="lede">Every number you receive is kept here on this phone, with how the blocks fell for each digit. By chance alone, about 3 in 10 numbers win some prize within a year of draws, so a win is luck, not proof.</p>
+      <ul class="journal-list" id="journalList"></ul>
+    </section>
+
+    <!-- ================= ABOUT ================= -->
+    <section id="about" class="view about" hidden aria-labelledby="aboutTitle">
+      <h1 class="view-title" id="aboutTitle"><span class="brush" lang="zh-Hans">知</span>How it works</h1>
+      <div class="card">
+        <h2>The ritual</h2>
+        <ol id="ritualSteps">
+          <li><strong>Write 0 to 9</strong> on ten slips of paper and fold each one twice, so the numbers are hidden.</li>
+          <li><strong>Choose who you are asking</strong> and introduce yourself, aloud or silently.</li>
+          <li><strong>Pray with the ten slips</strong> (0 to 9) cupped in your palms. Bow until one slip falls out.</li>
+          <li><strong>Unfold the slip</strong> to read the digit.</li>
+          <li><strong>Throw the moon blocks</strong> (博杯) to ask if the digit is right.</li>
+          <li><strong>Fold the slip back into the pool</strong>, so the same digit can come again, and repeat for all four digits.</li>
+          <li><strong>Give thanks</strong> before you leave the altar.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h2>Reading the moon blocks <span class="brush" lang="zh-Hans">博杯</span></h2>
+        <div class="outcomes" id="outcomeFigures"></div>
+        <ul id="outcomeNotes"></ul>
+        <p>One 圣杯 is enough for most requests. The strict custom asks for three in a row, which takes about 14 throws per digit. Repeated 阴杯 is a sign to stop and ask again another day.</p>
+      </div>
+      <div class="card">
+        <h2>Who to ask</h2>
+        <p>Your ancestors, Tua Pek Kong (大伯公), the God of Fortune (财神爷), Datuk Kong (拿督公), or the deity at your own altar. Guan Yin is left out, because many Buddhists feel she should not be asked for lottery numbers. Offerings to Datuk Kong are kept free of pork and alcohol.</p>
+      </div>
+      <div class="card">
+        <h2>Using motion</h2>
+        <ul id="motionNotes">
+          <li><strong>Bow</strong>: hold the phone flat between both palms, screen up, and bow slowly. Each bow is counted; a slip falls after the third, fourth or fifth bow.</li>
+          <li><strong>Throw</strong>: hold the phone firmly and give it one quick toss-and-stop flick, as if releasing the blocks. Never let go of your phone.</li>
+          <li>Every motion also has a button, so you can do the whole ritual by touch, and you can switch motion off at any step.</li>
+          <li>Motion needs the page to be opened directly in Safari or Chrome over HTTPS. Inside the Claude viewer the sensors are blocked, so the app uses touch. On iPhone, tap Allow when asked for motion access.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h2>Is it fair?</h2>
+        <p>Each slip is chosen with your phone's secure random generator, and each block lands flat side up or round side up with even odds. Because the slip goes back into the pool every time, <strong>every number from 0000 to 9999 is equally likely</strong>. The ritual decides which number you receive. It cannot make a number more likely to win.</p>
+      </div>
+      <div class="card">
+        <h2>About the history data</h2>
+        <p id="dataNote"></p>
+      </div>
+      <div class="card">
+        <h2>Play responsibly</h2>
+        <p>Heng Ong Huat is for tradition and fun. It does not sell or place bets and is not affiliated with Singapore Pools, the licensed operator of 4D. Every 4D number has the same 1 in 10,000 chance at each prize, and about 1 in 435 of winning any prize in a draw with a Big bet (a Small bet pays only the top three prizes: about 1 in 3,333). You must be 18 to buy 4D at an outlet and 21 to bet online. Popular numbers can sell out. Only spend what you can afford to lose.</p>
+        <p>Need someone to talk to? National Problem Gambling Helpline, free and confidential, 8am to 11pm daily:</p>
+        <p class="helpline" id="helpline">1800-6-668-668</p>
+        <p>Webchat: <a href="https://go.gov.sg/ncpg-webchat" target="_blank" rel="noopener" style="color:var(--gold)">go.gov.sg/ncpg-webchat</a></p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<nav class="rail" aria-label="Sections">
+  <div class="rail-inner">
+    <a href="#seek" data-view="seek"><span class="brush" lang="zh-Hans">求</span>Seek</a>
+    <a href="#history" data-view="history"><span class="brush" lang="zh-Hans">史</span>History</a>
+    <a href="#journal" data-view="journal"><span class="brush" lang="zh-Hans">录</span>Journal</a>
+    <a href="#about" data-view="about"><span class="brush" lang="zh-Hans">知</span>About</a>
+  </div>
+</nav>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script id="hist-data" type="text/plain">__HISTORY_DATA__</script>
+<script>
+'use strict';
+(() => {
+  const $ = (s, el = document) => el.querySelector(s);
+  const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  /* ---------------- Randomness ---------------- */
+  const rand = {
+    int(n) { // unbiased integer in [0, n)
+      const buf = new Uint32Array(1);
+      const limit = Math.floor(4294967296 / n) * n;
+      let x;
+      do { crypto.getRandomValues(buf); x = buf[0]; } while (x >= limit);
+      return x % n;
+    },
+    float() { const b = new Uint32Array(1); crypto.getRandomValues(b); return b[0] / 4294967296; },
+  };
+
+  /* ---------------- Storage (per phone, optional) ---------------- */
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('hoh:' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem('hoh:' + k, JSON.stringify(v)); } catch { /* storage unavailable */ } },
+  };
+
+  /* ---------------- Dates (all draw dates are Singapore dates) ---------------- */
+  const EPOCH = Date.UTC(1986, 4, 31);
+  const DAY = 86400000;
+  const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dayDate = (d) => new Date(EPOCH + d * DAY);
+  const fmtDay = (d, withWd = true) => { const t = dayDate(d); return `${withWd ? WD[t.getUTCDay()] + ' ' : ''}${t.getUTCDate()} ${MON[t.getUTCMonth()]} ${t.getUTCFullYear()}`; };
+  const isoDay = (d) => dayDate(d).toISOString().slice(0, 10);
+  const dayFromIso = (s) => { const [y, m, dd] = s.split('-').map(Number); return Math.round((Date.UTC(y, m - 1, dd) - EPOCH) / DAY); };
+  const sgNowParts = () => { const t = new Date(Date.now() + 8 * 3600000); return t; }; // read with UTC getters
+
+  /* ---------------- Singapore Pools 4D history ---------------- */
+  const TIER = { 1: '1st Prize', 2: '2nd Prize', 3: '3rd Prize', S: 'Starter', C: 'Consolation', X: 'Starter / Consolation' };
+  const TIER_SHORT = { 1: '1st', 2: '2nd', 3: '3rd', S: 'Starter', C: 'Consol.', X: 'S / C' };
+  const H = (() => {
+    const raw = $('#hist-data').textContent.trim();
+    const parts = raw.split(';');
+    const n = parts.length;
+    let total = 0;
+    for (const p of parts) total += (p.length - p.indexOf(',') - 1) / 4;
+    const day = new Int32Array(n), start = new Int32Array(n + 1);
+    const num = new Uint16Array(total), drawOf = new Uint16Array(total), posOf = new Uint8Array(total);
+    let d = 0, k = 0;
+    for (let i = 0; i < n; i++) {
+      const p = parts[i], c = p.indexOf(',');
+      d += Number(p.slice(0, c));
+      day[i] = d; start[i] = k;
+      for (let j = c + 1, pos = 0; j < p.length; j += 4, pos++) {
+        num[k] = Number(p.substr(j, 4)); drawOf[k] = i; posOf[k] = pos; k++;
+      }
+    }
+    start[n] = k;
+    const off = new Int32Array(10001);
+    for (let i = 0; i < total; i++) off[num[i] + 1]++;
+    for (let v = 0; v < 10000; v++) off[v + 1] += off[v];
+    const idx = new Int32Array(total), fill = off.slice(0, 10000);
+    for (let i = 0; i < total; i++) idx[fill[num[i]]++] = i;
+    const size = (di) => start[di + 1] - start[di];
+    const tier = (i) => { const pos = posOf[i]; if (pos < 3) return pos + 1; if (size(drawOf[i]) !== 23) return 'X'; return pos < 13 ? 'S' : 'C'; };
+    return {
+      n, total, day, start, num, drawOf, posOf, size, tier,
+      occ: (v) => idx.subarray(off[v], off[v + 1]),
+      count: (v) => off[v + 1] - off[v],
+      expected: total / 10000,
+      drawNumbers: (di) => Array.from(num.subarray(start[di], start[di + 1])),
+      findDay(dd) { // index of the last draw on or before day dd
+        let lo = 0, hi = n - 1, ans = -1;
+        while (lo <= hi) { const m = (lo + hi) >> 1; if (day[m] <= dd) { ans = m; lo = m + 1; } else hi = m - 1; }
+        return ans;
+      },
+    };
+  })();
+  const pad4 = (v) => String(v).padStart(4, '0');
+  const LAST = H.n - 1;
+
+  function permutations(s) {
+    const out = new Set();
+    const rec = (pre, rest) => {
+      if (!rest.length) { out.add(pre); return; }
+      for (let i = 0; i < rest.length; i++) rec(pre + rest[i], rest.slice(0, i) + rest.slice(i + 1));
+    };
+    rec('', s);
+    return Array.from(out).sort();
+  }
+
+  function numberStats(str) {
+    const v = Number(str);
+    const occ = Array.from(H.occ(v)).sort((a, b) => b - a); // newest first
+    const byTier = { 1: 0, 2: 0, 3: 0, S: 0, C: 0, X: 0 };
+    for (const i of occ) byTier[H.tier(i)]++;
+    const perms = permutations(str).map((p) => ({ p, c: H.count(Number(p)) }));
+    const permTotal = perms.reduce((a, b) => a + b.c, 0);
+    return { v, str, occ, byTier, perms, permTotal };
+  }
+
+  /* ---------------- Sound (synthesised; starts after a tap) ---------------- */
+  const Sound = (() => {
+    let ctx = null, on = store.get('sound', true);
+    const ensure = () => {
+      if (!on) return null;
+      try {
+        if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === 'suspended') ctx.resume();
+      } catch { ctx = null; }
+      return ctx;
+    };
+    const noise = (c, dur) => {
+      const b = c.createBuffer(1, Math.max(1, Math.floor(c.sampleRate * dur)), c.sampleRate);
+      const d = b.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      const s = c.createBufferSource(); s.buffer = b; return s;
+    };
+    function clack(delay = 0, pitch = 1, vol = 0.5) {
+      const c = ensure(); if (!c) return;
+      const t = c.currentTime + delay;
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = 'triangle'; o.frequency.setValueAtTime(820 * pitch, t); o.frequency.exponentialRampToValueAtTime(420 * pitch, t + 0.09);
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      o.connect(g).connect(c.destination); o.start(t); o.stop(t + 0.14);
+      const n = noise(c, 0.05), f = c.createBiquadFilter(), g2 = c.createGain();
+      f.type = 'bandpass'; f.frequency.value = 2400 * pitch; f.Q.value = 1.2;
+      g2.gain.setValueAtTime(vol * 0.8, t); g2.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+      n.connect(f).connect(g2).connect(c.destination); n.start(t);
+    }
+    function rustle(dur = 0.28, vol = 0.18) {
+      const c = ensure(); if (!c) return;
+      const t = c.currentTime, n = noise(c, dur), f = c.createBiquadFilter(), g = c.createGain();
+      f.type = 'highpass'; f.frequency.value = 1800;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.04); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      n.connect(f).connect(g).connect(c.destination); n.start(t);
+    }
+    function bell() {
+      const c = ensure(); if (!c) return;
+      const t = c.currentTime;
+      [[523.25, 0.22], [1046.5 * 1.004, 0.08], [1568, 0.05], [2637, 0.025]].forEach(([fr, v]) => {
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = 'sine'; o.frequency.value = fr;
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 3.2);
+        o.connect(g).connect(c.destination); o.start(t); o.stop(t + 3.3);
+      });
+    }
+    return {
+      get on() { return on; },
+      set on(v) { on = v; store.set('sound', v); if (v) ensure(); },
+      clack, rustle, bell, unlock: ensure,
+    };
+  })();
+  const buzz = (p) => { try { navigator.vibrate && navigator.vibrate(p); } catch { /* not supported */ } };
+
+  /* ---------------- Motion sensing ----------------
+   * Browsers have disagreed on axes, units and the sign of gravity (iOS still reports it
+   * inverted), so the detectors only use sign-independent values: pitch measured from flat,
+   * and acceleration magnitudes. Timing comes from event.timeStamp. Sensor data drives
+   * gestures only; slips and block faces always come from crypto randomness. */
+  const Motion = (() => {
+    const isNum = (v) => typeof v === 'number' && isFinite(v);
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const lpAlpha = (dt, tau) => dt / (tau + dt);
+
+    // Must run synchronously inside a tap: iOS shows its prompt only during a user gesture.
+    // Chromium has its own requestPermission() too, so it is called wherever it exists.
+    function request() {
+      if (window.isSecureContext === false) return Promise.resolve('insecure');
+      const DME = window.DeviceMotionEvent, DOE = window.DeviceOrientationEvent;
+      if (!DME) return Promise.resolve('unsupported');
+      const calls = [];
+      try {
+        if (typeof DME.requestPermission === 'function') calls.push(DME.requestPermission());
+        if (DOE && typeof DOE.requestPermission === 'function') calls.push(DOE.requestPermission());
+      } catch { return Promise.resolve('denied'); }
+      if (!calls.length) return Promise.resolve('granted');
+      return Promise.all(calls.map((p) => Promise.resolve(p).then((r) => r, (e) => (e && e.name === 'NotAllowedError' ? 'needs-gesture' : 'denied'))))
+        .then((rs) => (rs[0] === 'denied' ? 'denied' : rs.includes('needs-gesture') ? 'needs-gesture' : 'granted'));
+    }
+
+    // 'live' once real numbers arrive, 'null' for empty events (desktop), 'silent' when nothing comes (blocked frame).
+    function probe(timeoutMs = 1500) {
+      return new Promise((resolve) => {
+        if (!('DeviceMotionEvent' in window)) { resolve({ status: 'unsupported' }); return; }
+        let live = 0, nulls = 0, done = false;
+        const on = (e) => {
+          const g = e.accelerationIncludingGravity;
+          if (g && isNum(g.x) && isNum(g.y) && isNum(g.z)) { if (++live >= 3) finish('live'); } else nulls++;
+        };
+        const timer = setTimeout(() => finish(live ? 'live' : nulls ? 'null' : 'silent'), timeoutMs);
+        function finish(status) { if (done) return; done = true; clearTimeout(timer); window.removeEventListener('devicemotion', on); resolve({ status }); }
+        window.addEventListener('devicemotion', on);
+      });
+    }
+
+    // One listener; turns raw events into samples: pitch from flat and linear-acceleration size.
+    class Hub {
+      constructor() { this.subs = new Set(); this.grav = null; this.lastT = 0; this.on = this.onMotion.bind(this); this.running = false; }
+      start() { if (!this.running) { this.running = true; window.addEventListener('devicemotion', this.on); } }
+      stop() { if (this.running) { this.running = false; window.removeEventListener('devicemotion', this.on); this.grav = null; this.lastT = 0; } }
+      subscribe(fn) { this.subs.add(fn); return () => this.subs.delete(fn); }
+      onMotion(e) {
+        const gi = e.accelerationIncludingGravity, la = e.acceleration, rr = e.rotationRate;
+        if (!gi || !isNum(gi.x) || !isNum(gi.y) || !isNum(gi.z)) return;
+        const t = e.timeStamp || performance.now();
+        const dt = this.lastT ? clamp((t - this.lastT) / 1000, 0.004, 0.1) : 1 / 60;
+        this.lastT = t;
+        const g = [gi.x, gi.y, gi.z];
+        if (!this.grav) this.grav = g.slice();
+        const k = lpAlpha(dt, 0.25);
+        for (let i = 0; i < 3; i++) this.grav[i] += k * (g[i] - this.grav[i]);
+        const lin = la && isNum(la.x) && isNum(la.y) && isNum(la.z) ? [la.x, la.y, la.z] : g.map((v, i) => v - this.grav[i]);
+        const angle = screen.orientation && isNum(screen.orientation.angle) ? screen.orientation.angle : 0;
+        const landscape = Math.abs(angle) === 90 || angle === 270;
+        const zs = g[2] < 0 ? -1 : 1; // flipping every axis (iOS) leaves this pitch unchanged
+        const pitch = Math.atan2((landscape ? g[0] : g[1]) * zs, Math.abs(g[2])) * 180 / Math.PI;
+        const rotMag = rr && [rr.alpha, rr.beta, rr.gamma].some(isNum) ? Math.hypot(rr.alpha || 0, rr.beta || 0, rr.gamma || 0) : null;
+        const s = { t, dt, lin, linMag: Math.hypot(lin[0], lin[1], lin[2]), rotMag, pitch };
+        this.subs.forEach((fn) => fn(s));
+      }
+    }
+
+    // A bow is one trip away from the resting angle and back.
+    //  - Tilting bows count when the phone comes back near rest, so continuous bobbing works.
+    //  - Bows that only dip the hands (phone kept flat) count once the phone settles again.
+    //  - Settling at a new angle (laying the phone flat after reading it) sets a new rest
+    //    without counting; settling near flat is accepted quickly, since that is the asked pose.
+    //  - A long pause at the bottom of a bow still counts when the phone comes back.
+    function bowDetector(onBow, onTilt) {
+      const o = { high: 12, low: 6, dip: 2.6, steadyDeg: 2, steadyLin: 1, settleMs: 250, reposeMs: 600, flatMs: 250, flatDeg: 15, tiltGapMs: 450, dipGapMs: 700, pendingMs: 4000 };
+      let anchor = null, exc = null, steadyRef = null, steadyMs = 0, lastBow = -Infinity, pending = null, p = null;
+      const count = (t) => { lastBow = t; exc = null; onBow(); };
+      return (s) => {
+        p = p === null ? s.pitch : p + lpAlpha(s.dt, 0.06) * (s.pitch - p);
+        const lin = s.linMag, t = s.t;
+        if (anchor === null) { anchor = p; steadyRef = p; }
+        if (Math.abs(p - steadyRef) <= o.steadyDeg && lin < o.steadyLin) steadyMs += s.dt * 1000; else { steadyMs = 0; steadyRef = p; }
+        if (onTilt) onTilt(p - anchor);
+        const dev = Math.abs(p - anchor);
+        const backFromPause = pending && steadyMs >= o.settleMs && Math.abs(p - pending.anchor) < o.low && t - pending.t < o.pendingMs;
+        if (!exc) {
+          const since = t - lastBow;
+          if (backFromPause) { anchor = pending.anchor; pending = null; count(t); return; }
+          if ((dev > o.high && since > o.tiltGapMs) || (lin > o.dip && since > o.dipGapMs)) exc = { tilt: dev, lin };
+          else if (steadyMs > 600 && dev < o.low) anchor = p; // follow slow drift while resting
+          return;
+        }
+        exc.tilt = Math.max(exc.tilt, dev); exc.lin = Math.max(exc.lin, lin);
+        if (backFromPause) { anchor = pending.anchor; pending = null; count(t); return; }
+        if (exc.tilt >= o.high && dev < o.low) { pending = null; count(t); return; }
+        if (exc.tilt < o.high && dev < o.low && steadyMs >= o.settleMs) {
+          if (exc.lin >= o.dip) { pending = null; count(t); } else exc = null;
+          return;
+        }
+        const nearFlat = Math.abs(p) < o.flatDeg && Math.abs(anchor) > o.flatDeg + o.low;
+        if (dev >= o.low && (steadyMs >= o.reposeMs || (nearFlat && steadyMs >= o.flatMs))) {
+          pending = exc.tilt >= o.high && !nearFlat ? { anchor, t } : null;
+          anchor = p; exc = null;
+        }
+      };
+    }
+
+    // A toss: hold still, then a launch-and-brake flick, one very hard jolt, or a fast wrist turn.
+    function tossDetector(onToss) {
+      let calmSince = null, armed = false, launch = null, lastFire = -Infinity;
+      const fire = (t) => { lastFire = t; armed = false; calmSince = null; launch = null; onToss(); };
+      return (s) => {
+        if (s.t - lastFire < 1200) return;
+        if (!armed) {
+          if (s.linMag < 2.5) { if (calmSince === null) calmSince = s.t; if (s.t - calmSince >= 300) armed = true; }
+          else calmSince = null;
+          return;
+        }
+        if ((isNum(s.rotMag) && s.rotMag >= 350 && s.linMag >= 8) || s.linMag >= 24) { fire(s.t); return; }
+        if (!launch && s.linMag >= 14) { launch = { t: s.t, u: s.lin.map((v) => v / s.linMag) }; return; }
+        if (launch) {
+          if (s.t - launch.t > 400) { launch = null; return; }
+          if (s.lin[0] * launch.u[0] + s.lin[1] * launch.u[1] + s.lin[2] * launch.u[2] <= -6) fire(s.t);
+        }
+      };
+    }
+
+    // The sensors only run while a detector (or the debug readout) is listening.
+    const hub = new Hub();
+    let enabled = false, off = null, watchers = 0;
+    const sync = () => { if (enabled && (off || watchers)) hub.start(); else hub.stop(); };
+    return {
+      request, probe,
+      get enabled() { return enabled; },
+      enable(on) { enabled = on; if (!on && off) { off(); off = null; } sync(); },
+      set(mode, h = {}) {
+        if (off) { off(); off = null; }
+        if (enabled && mode === 'bow') off = hub.subscribe(bowDetector(() => h.bow && h.bow(), h.tilt));
+        else if (enabled && mode === 'toss') off = hub.subscribe(tossDetector(() => h.toss && h.toss()));
+        sync();
+      },
+      watch(fn) { watchers++; const u = hub.subscribe(fn); sync(); return () => { u(); watchers--; sync(); }; },
+      _bowDetector: bowDetector,
+    };
+  })();
+
+  /* ---------------- Wake lock (keeps the screen on during prayer) ---------------- */
+  let wakeLock = null;
+  async function keepAwake() {
+    try { if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } } catch { wakeLock = null; }
+  }
+
+  /* ---------------- Settings ---------------- */
+  // Guan Yin is left out on purpose: many Buddhists object to asking her for lottery numbers.
+  const DEITIES = [
+    { id: 'ancestors', cn: '祖先', en: 'Ancestors', ask: 'your ancestors', invite: '列祖列宗', self: '子孙', tablet: '历代祖先' },
+    { id: 'tpk', cn: '大伯公', en: 'Tua Pek Kong', ask: 'Tua Pek Kong', invite: '大伯公', self: '弟子', tablet: '福德正神' },
+    { id: 'caishen', cn: '财神爷', en: 'God of Fortune', ask: 'the God of Fortune', invite: '财神爷', self: '弟子', tablet: '财神爷' },
+    { id: 'datuk', cn: '拿督公', en: 'Datuk Kong', ask: 'Datuk Kong', invite: '拿督公', self: '弟子', tablet: '拿督公' },
+    { id: 'altar', cn: '神明', en: 'My altar deity', ask: 'the deity at your altar', invite: '神明', self: '弟子', tablet: '神明' },
+  ];
+  const settings = Object.assign({ deity: 'ancestors', need: 1, input: 'auto' }, store.get('settings', {}));
+  if (!DEITIES.some((d) => d.id === settings.deity)) settings.deity = 'ancestors';
+  const saveSettings = () => store.set('settings', settings);
+  const deity = () => DEITIES.find((d) => d.id === settings.deity) || DEITIES[0];
+  const CN_DIGIT = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+  const OUTCOME = {
+    sheng: { cn: '圣杯', en: 'Yes', name: 'Holy blocks', say: 'One flat face up, one round face up. The answer is yes: keep this digit.' },
+    xiao: { cn: '笑杯', en: 'Laughing', name: 'Laughing blocks', say: 'Both flat faces up. The deity smiles: the answer is unclear. Ask sincerely once more.' },
+    yin: { cn: '阴杯', en: 'No', name: 'Yin blocks', say: 'Both round faces up. Not this one. The slip is folded back into the pool.' },
+  };
+
+  // In three-in-a-row mode an early 圣杯 is only a partial yes.
+  const sayFor = (k) => (k === 'sheng' && R.streak < settings.need ? `One flat face up, one round face up: a yes, ${R.streak} of ${settings.need} in a row.` : OUTCOME[k].say);
+
+  /* ---------------- DOM refs ---------------- */
+  const stage = $('#stage'), hands = $('#hands'), slipEl = $('#slip');
+  const blockL = $('#blockL'), blockR = $('#blockR'), verdict = $('#verdict'), panel = $('#panel');
+
+  function announce(msg) { const l = $('#live'); l.textContent = ''; setTimeout(() => { l.textContent = msg; }, 30); }
+  function toast(msg) {
+    const t = $('#toast'); t.textContent = msg; t.hidden = false;
+    clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 2600);
+  }
+
+  /* ---------------- Ritual state ---------------- */
+  const R = {
+    state: 'intro', pos: 0, digits: [], bows: 0, fallAt: 3, digit: null, streak: 0, busy: false,
+    inputMode: 'touch', // 'motion' once sensors are confirmed
+    motionWhy: 'off',
+    log: [], // per position: [{ digit, throws: ['sheng'|'xiao'|'yin'], kept }]
+    startedAt: 0,
+  };
+
+  function renderSlots() {
+    const el = $('#slots');
+    el.innerHTML = '';
+    for (let i = 0; i < 4; i++) {
+      const s = document.createElement('div');
+      const filled = R.digits[i] != null;
+      s.className = 'slot' + (filled ? ' filled' : '') + (!filled && i === R.pos && R.state !== 'intro' ? ' current' : '');
+      s.setAttribute('role', 'img');
+      s.setAttribute('aria-label', `Digit ${i + 1}: ${filled ? R.digits[i] : 'not yet received'}`);
+      s.innerHTML = `<small>${i + 1}</small>${filled ? R.digits[i] : '·'}`;
+      el.appendChild(s);
+    }
+  }
+  function stampSlot(i) { const s = $('#slots').children[i]; if (s) { s.classList.add('stamp'); } }
+
+  /* --- geometry helpers for animating inside the stage --- */
+  const sz = () => ({ w: stage.clientWidth, h: stage.clientHeight });
+  const tableY = () => sz().h * 0.62;
+  function placeBlocksAtRest() {
+    const { w } = sz(), ty = tableY();
+    setXY(blockL, 26, ty + 22, -66); setXY(blockR, 34, ty + 16, -60);
+    blockL.className = 'block show-round'; blockR.className = 'block show-round';
+  }
+  function placeBlocksHeld() {
+    const { w } = sz(), ty = tableY();
+    setXY(blockL, w / 2 - 34, ty + 30, -66); setXY(blockR, w / 2 - 26, ty + 24, -60);
+    blockL.className = 'block show-round'; blockR.className = 'block show-round';
+  }
+  function setXY(el, x, y, r = 0) { el.style.transform = `translate(${x}px, ${y}px) rotate(${r}deg)`; el.dataset.x = x; el.dataset.y = y; el.dataset.r = r; }
+
+  /* ---------------- Panel rendering per state ---------------- */
+  const WHY = {
+    off: () => (inFrame ? 'Motion sensors are blocked inside this viewer, so you bow and throw by touch.' : 'Motion is off. You bow and throw by touch.'),
+    silent: () => (inFrame ? 'Motion sensors are blocked inside this viewer, so you bow and throw by touch.' : 'No motion data came through. Open this page directly in Safari or Chrome to use motion.'),
+    null: () => 'This device has no motion sensors, so you bow and throw by touch.',
+    unsupported: () => 'This browser has no motion sensors, so you bow and throw by touch.',
+    denied: () => 'Motion access was declined. Safari may not ask again until it restarts or this site’s data is cleared. Touch works the same.',
+    insecure: () => 'Motion needs a secure (https) page. Using touch.',
+    'needs-gesture': () => 'Tap “Try motion” to allow motion access.',
+  };
+  function modeNote() {
+    if (R.inputMode === 'motion') return `<p class="mode-note">Motion is on. <button type="button" class="linklike" data-act="use-touch">Use touch instead</button></p>`;
+    const why = (WHY[R.motionWhy] || WHY.off)();
+    return `<p class="mode-note">${why} <button type="button" class="linklike" data-act="use-motion">Try motion</button></p>`;
+  }
+  const bowDots = () => Array.from({ length: Math.max(3, R.bows) }, (_, i) => `<i class="${i < R.bows ? 'on' : ''}"></i>`).join('') + `<span>${R.bows} ${R.bows === 1 ? 'bow' : 'bows'}</span>`;
+
+  function renderPanel() {
+    const d = deity();
+    let h = '';
+    switch (R.state) {
+      case 'intro': {
+        const adult = store.get('adult', false);
+        h = `
+          <h2><span class="brush" lang="zh-Hans">求真字</span>Ask for your 4D number</h2>
+          <fieldset>
+            <legend>Who are you asking?</legend>
+            <div class="chips">${DEITIES.map((x) => `<label class="chip"><input type="radio" name="deity" value="${x.id}" ${x.id === d.id ? 'checked' : ''}><span><b lang="zh-Hans">${x.cn}</b>${x.en}</span></label>`).join('')}</div>
+          </fieldset>
+          <fieldset>
+            <legend>Confirm each digit with</legend>
+            <div class="chips">
+              <label class="chip"><input type="radio" name="need" value="1" ${settings.need === 1 ? 'checked' : ''}><span><b lang="zh-Hans">一圣杯</b>One yes</span></label>
+              <label class="chip"><input type="radio" name="need" value="3" ${settings.need === 3 ? 'checked' : ''}><span><b lang="zh-Hans">三圣杯</b>Three in a row</span></label>
+            </div>
+            <p class="small" style="margin-top:8px">${settings.need === 3 ? 'The strict custom. It takes about 14 throws per digit.' : 'One 圣杯 is enough for most requests. Three in a row is the strict custom.'}</p>
+          </fieldset>
+          <div class="prayer">
+            <span class="eyebrow">Before you begin, say it aloud or silently</span>
+            <span class="cn" lang="zh-Hans">${d.self}＿＿诚心诚意，恭请${d.invite}降临。今日诚心求一组真字，恳请指点。</span>
+            <span class="en">“I, (your name), sincerely invite ${esc({ ancestors: 'my ancestors', altar: 'the deity of my altar' }[d.id] || d.ask)} to be present. Today I ask for a set of four digits. Please guide me.” Add your birth date and address if you wish, as you would at the altar.</span>
+          </div>
+          <label class="check"><input type="checkbox" id="age18" ${adult ? 'checked' : ''}><span>I am 18 or older</span></label>
+          <div class="actions"><button type="button" class="btn btn-primary btn-big" data-act="begin" ${adult ? '' : 'disabled'}><span class="brush" lang="zh-Hans">开始</span>Begin</button></div>
+          <p class="mode-note">${inFrame ? 'Inside this viewer the phone sensors are blocked, so you will bow and throw by touch.' : 'On a phone you can bow and throw with motion. You will be asked to allow motion access.'}</p>`;
+        break;
+      }
+      case 'prepare':
+        h = `
+          <h2><span class="brush" lang="zh-Hans">写字</span>Writing the slips</h2>
+          <p id="prepStatus">Ten slips of paper, 0 to 9, each written by brush.</p>
+          <div class="actions"><button type="button" class="btn btn-quiet" data-act="skip-prep">Skip</button></div>`;
+        break;
+      case 'pray':
+        h = `
+          <h2><span class="brush" lang="zh-Hans">拜</span>Digit ${R.pos + 1} of 4: pray</h2>
+          <p>${R.inputMode === 'motion'
+            ? '<strong>Hold the phone flat between your palms, screen up, and bow slowly.</strong> Keep bowing until a slip falls out.'
+            : '<strong>Tap Bow, or drag the hands down and up.</strong> Keep bowing until a slip falls out.'}</p>
+          <div class="meter" aria-label="${R.bows} bows">${bowDots()}</div>
+          <div class="actions"><button type="button" class="btn btn-primary btn-big" data-act="bow"><span class="brush" lang="zh-Hans">拜</span>Bow</button></div>
+          ${modeNote()}`;
+        break;
+      case 'fallen':
+        h = `
+          <h2><span class="brush" lang="zh-Hans">落</span>A slip has fallen</h2>
+          <p>${R.inputMode === 'motion' ? 'Unfolding it now…' : '<strong>Tap the slip</strong> on the altar to unfold it.'}</p>
+          <div class="actions"><button type="button" class="btn btn-primary btn-big" data-act="unfold">Unfold the slip</button></div>`;
+        break;
+      case 'unfolded':
+        h = `
+          <h2><span class="brush" lang="zh-Hans">问</span>The slip reads ${R.digit}</h2>
+          <div class="prayer compact">
+            <span class="cn" lang="zh-Hans">这个字是${CN_DIGIT[R.digit]}，若是${d.invite}所赐，请赐圣杯。</span>
+            <span class="en">“This digit is ${R.digit}. If it is your gift, please grant a 圣杯.”</span>
+          </div>
+          <p>${R.inputMode === 'motion'
+            ? '<strong>Hold the phone firmly and give it one quick toss-and-stop flick.</strong> Never let go of your phone.'
+            : '<strong>Swipe up on the altar</strong>, or tap Throw.'}</p>
+          ${settings.need === 3 ? `<p class="small">Three 圣杯 in a row are needed. So far: ${R.streak} of 3.</p>` : ''}
+          <div class="actions"><button type="button" class="btn btn-primary btn-big" data-act="throw"><span class="brush" lang="zh-Hans">掷杯</span>Throw the blocks</button></div>
+          ${modeNote()}`;
+        break;
+      case 'throwing':
+        h = `<h2><span class="brush" lang="zh-Hans">博杯</span>The blocks are falling…</h2><p>&nbsp;</p>`;
+        break;
+      case 'landed': {
+        const o = OUTCOME[R.lastOutcome];
+        const again = (R.lastOutcome === 'sheng' && R.streak < settings.need) || R.lastOutcome === 'xiao';
+        const next = again ? `<div class="actions"><button type="button" class="btn btn-primary btn-big" data-act="throw"><span class="brush" lang="zh-Hans">再掷</span>Throw again</button></div>` : '';
+        const ask = again ? `<div class="prayer compact"><span class="cn" lang="zh-Hans">这个字是${CN_DIGIT[R.digit]}，若是${d.invite}所赐，请赐圣杯。</span><span class="en">Still asking about slip ${R.digit}: “If it is your gift, please grant a 圣杯.”</span></div>` : '';
+        h = `
+          <h2><span class="brush" lang="zh-Hans">${o.cn}</span>${o.en}</h2>
+          <p>${sayFor(R.lastOutcome)}</p>
+          ${ask}${next}
+          ${next ? modeNote() : ''}`;
+        break;
+      }
+      case 'complete':
+        h = renderFinal();
+        break;
+    }
+    // Keep keyboard and screen-reader focus in the panel across re-renders, even through
+    // states without a button (the heading takes focus then).
+    const ae = document.activeElement;
+    const hadFocus = panel.contains(ae) || (R.panelFocus && (!ae || ae === document.body));
+    panel.innerHTML = h;
+    R.panelFocus = hadFocus;
+    if (hadFocus) {
+      const f = panel.querySelector('.btn-primary:not([disabled]), button:not([disabled]), input') || panel.querySelector('h2');
+      if (f) { if (f.tagName === 'H2') f.tabIndex = -1; f.focus({ preventScroll: true }); }
+    }
+    // Bring the next action into view above the tab bar.
+    if (R.state !== 'intro' && currentView === 'seek') {
+      const nb = panel.querySelector('.btn-primary');
+      if (nb) nb.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+    }
+  }
+
+  function renderFinal() {
+    const str = R.digits.join('');
+    const d = deity();
+    return `
+      <div class="final">
+        <span class="eyebrow">Your number from ${esc(d.ask)}</span>
+        <h2><span class="brush" lang="zh-Hans">发</span>${str.split('').join(' ')}</h2>
+        <div class="prayer compact">
+          <span class="cn" lang="zh-Hans">多谢${d.invite}指点，${d.self}拜谢。</span>
+          <span class="en">Before you leave the altar: “Thank you for your guidance. I bow in gratitude.”</span>
+        </div>
+        <p class="muted small">Saved to your journal.</p>
+        <div class="actions">
+          <button type="button" class="btn btn-primary" data-act="copy">Copy ${str}</button>
+          <button type="button" class="btn" data-act="history" data-num="${str}">Full history</button>
+          <button type="button" class="btn btn-quiet" data-act="again">Ask again</button>
+        </div>
+        ${storyHTML(str, false)}
+        <div class="card">
+          <span class="eyebrow">How the blocks fell</span>
+          <ol class="ritual-log">${R.log.map((p, i) => `<li><b>${R.digits[i]}</b><span>${describeLog(p)}</span></li>`).join('')}</ol>
+        </div>
+        <p class="small muted">Popular numbers can sell out at Singapore Pools, so this one may not be available to buy. Every number has the same 1 in 10,000 chance at each prize. Need to talk about gambling? Call the National Problem Gambling Helpline, 1800-6-668-668 (8am to 11pm daily).</p>
+      </div>`;
+  }
+  function describeLog(tries) {
+    return tries.map((t) => `slip ${t.digit}: ${t.throws.map((o) => OUTCOME[o].cn).join(' ')}${t.kept ? ' ✓' : ''}`).join(' · ');
+  }
+
+  /* ---------------- Paper slips: brush-written, folded in half twice ----------------
+   * A sheet is a small 3D card. The full sheet folds right over left, then the half sheet
+   * folds top over bottom, leaving a quarter-size folded slip at its lower-left corner. */
+  const DIGIT_PATHS = [
+    'M52 20 C 30 20, 20 46, 20 72 C 20 100, 32 122, 50 122 C 70 122, 80 98, 80 70 C 80 42, 70 20, 50 20',
+    'M34 42 C 42 36, 50 28, 55 20 L 55 124',
+    'M24 44 C 26 28, 38 20, 51 20 C 66 20, 77 31, 76 46 C 75 64, 50 86, 22 122 C 42 120, 62 120, 82 121',
+    'M24 32 C 34 22, 46 19, 56 20 C 70 22, 77 34, 72 48 C 68 60, 56 66, 42 67 C 60 67, 79 78, 79 98 C 79 116, 62 126, 46 125 C 36 124, 27 119, 21 111',
+    'M62 20 C 46 44, 30 68, 18 92 L 86 92 M 66 54 L 64 125',
+    'M76 21 L 35 22 L 28 66 C 38 60, 50 57, 60 59 C 75 62, 82 78, 80 95 C 78 115, 60 126, 44 124 C 34 123, 26 118, 21 111',
+    'M71 23 C 48 22, 27 44, 22 76 C 18 104, 32 124, 51 124 C 69 124, 80 109, 79 93 C 78 76, 65 66, 50 66 C 37 66, 27 75, 23 86',
+    'M20 24 C 40 22, 60 22, 81 22 C 64 52, 52 84, 43 125',
+    'M51 69 C 33 63, 26 52, 28 40 C 30 27, 41 20, 52 20 C 64 20, 74 28, 73 41 C 72 55, 61 63, 51 69 C 35 77, 24 88, 24 102 C 24 117, 37 125, 51 125 C 66 125, 78 116, 78 102 C 78 87, 66 76, 51 69',
+    'M77 48 C 75 30, 63 20, 50 20 C 35 20, 24 31, 24 46 C 24 62, 36 72, 50 72 C 64 72, 74 62, 77 48 C 79 78, 72 104, 60 125',
+  ];
+  const INK_VB = '-15 -15 130 170';
+  const inkSvg = (d) => `<svg class="ink" viewBox="${INK_VB}" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><path d="${DIGIT_PATHS[d]}"/></svg>`;
+  function makeSheet(digit, w, h, cls) {
+    const el = document.createElement('div');
+    el.className = `sheet ${cls || ''}`;
+    el.style.setProperty('--w', `${w}px`); el.style.setProperty('--h', `${h}px`);
+    el.dataset.w = w; el.dataset.h = h;
+    const ink = inkSvg(digit);
+    el.innerHTML = `
+      <div class="sv"><div class="lf l"><div class="fc">${ink}</div></div><div class="lf r"><div class="fc">${ink}</div><div class="fc by"></div></div></div>
+      <div class="sh"><div class="lf b"><div class="fc bk"></div></div><div class="lf t"><div class="fc bk"></div><div class="fc bk bx"></div></div></div>
+      <svg class="pen" viewBox="${INK_VB}" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><g class="brush"><rect class="handle" x="-4.5" y="-96" width="9" height="66" rx="3.5"/><rect class="ferrule" x="-5.5" y="-36" width="11" height="10" rx="2"/><path class="tip" d="M0 0 C -6 -8, -6.5 -20, 0 -30 C 6.5 -20, 6 -8, 0 0 Z"/></g></svg>`;
+    return el;
+  }
+  // Brush-writes the digit stroke by stroke, with the brush following the line.
+  function writeSheet(el, digit, ms) {
+    const pen = el.querySelector('.pen');
+    if (!pen) return Promise.resolve();
+    if (!ms || reduceMotion) { el.classList.add('written'); pen.remove(); return Promise.resolve(); }
+    const NS = 'http://www.w3.org/2000/svg', brush = pen.querySelector('.brush');
+    const subs = DIGIT_PATHS[digit].match(/M[^M]+/g).map((d) => {
+      const p = document.createElementNS(NS, 'path'); p.setAttribute('d', d.trim()); pen.insertBefore(p, brush);
+      const L = p.getTotalLength() || 1; p.style.strokeDasharray = `${L} ${L}`; p.style.strokeDashoffset = L;
+      return { p, L };
+    });
+    const total = subs.reduce((a, s) => a + s.L, 0);
+    pen.classList.add('writing');
+    return new Promise((resolve) => {
+      let i = 0, t0 = performance.now();
+      const finish = () => { el.classList.add('written'); pen.classList.add('lift'); setTimeout(() => pen.remove(), 260); resolve(); };
+      const step = (now) => {
+        if (!el.isConnected) { resolve(); return; }
+        const s = subs[i], dur = ms * s.L / total, k = Math.min(1, (now - t0) / dur);
+        const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+        s.p.style.strokeDashoffset = s.L * (1 - e);
+        try { const pt = s.p.getPointAtLength(s.L * e); brush.setAttribute('transform', `translate(${pt.x.toFixed(1)} ${pt.y.toFixed(1)}) rotate(28)`); } catch { /* detached */ }
+        if (k >= 1) { i++; t0 = now; if (i >= subs.length) { finish(); return; } }
+        requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    });
+  }
+  async function foldSheet(el, ms) {
+    ms = reduceMotion ? 0 : ms;
+    el.style.setProperty('--fold-ms', `${ms}ms`);
+    el.classList.add('f1'); await wait(ms + 30);
+    el.classList.add('f1done'); void el.offsetWidth;
+    el.classList.add('f2'); await wait(ms + 30);
+  }
+  async function unfoldSheet(el, ms) {
+    ms = reduceMotion ? 0 : ms;
+    el.style.setProperty('--fold-ms', `${ms}ms`);
+    el.classList.remove('f2'); await wait(ms + 30);
+    el.classList.remove('f1done'); void el.offsetWidth;
+    el.classList.remove('f1'); await wait(ms + 30);
+  }
+  // Where slips enter and leave the cupped hands (the gap between the palms), in viewport pixels.
+  function peekPoint() {
+    const hb = hands.getBoundingClientRect();
+    return { x: hb.left + hb.width * 161 / 240, y: hb.top + hb.height * 240 / 320 };
+  }
+  // Moves a folded sheet's visible quarter into the hands and fades it out.
+  function flyToHands(el, ms) {
+    if (reduceMotion) return Promise.resolve();
+    const r = el.getBoundingClientRect(), W = Number(el.dataset.w), Hh = Number(el.dataset.h), p = peekPoint();
+    const dx = p.x - (r.left + W / 4), dy = p.y - (r.top + Hh * 0.75), s = Math.min(1, 16 / (W / 2));
+    return el.animate([
+      { transform: 'none', opacity: 1 },
+      { transform: `translate(${dx * 0.6}px, ${dy * 0.6 - 30}px) scale(${(1 + s) / 2}) rotate(-12deg)`, opacity: 1, offset: 0.6 },
+      { transform: `translate(${dx}px, ${dy}px) scale(${s}) rotate(-24deg)`, opacity: 0 },
+    ], { duration: ms, easing: 'cubic-bezier(.45,0,.55,1)', fill: 'forwards' }).finished.catch(() => {});
+  }
+
+  /* --- Before the first prayer: write 0 to 9 on ten slips, fold them, cup them in the hands --- */
+  function skipPrepare() { const tok = R.prep; if (!tok || tok.skipped) return; tok.skipped = true; tok.wakers.forEach((f) => f()); }
+  async function prepareSlips() {
+    const tok = R.prep = { skipped: false, wakers: new Set() };
+    // With reduced motion the slips appear written and folded almost at once.
+    const pace = reduceMotion ? 0.08 : 1;
+    const nap = (ms) => new Promise((res) => {
+      ms *= pace;
+      if (tok.skipped) { res(); return; }
+      const done = () => { tok.wakers.delete(done); clearTimeout(timer); res(); };
+      const timer = setTimeout(done, ms); tok.wakers.add(done);
+    });
+    setState('prepare');
+    hands.classList.add('gone'); stage.classList.add('prep');
+    const { w: W, h: Hh } = sz();
+    const gap = 10, sw = Math.floor(Math.min(60, (W - 32 - 4 * gap) / 5)), shh = Math.round(sw * 190 / 150);
+    const gx = (W - (5 * sw + 4 * gap)) / 2, gy = Math.max(10, (Hh - (2 * shh + 16)) / 2);
+    const sheets = [];
+    for (let d = 0; d < 10; d++) {
+      const el = makeSheet(d, sw, shh, 'mini');
+      el.style.left = `${gx + (d % 5) * (sw + gap)}px`; el.style.top = `${gy + Math.floor(d / 5) * (shh + 16)}px`;
+      stage.appendChild(el); sheets.push(el);
+    }
+    announce('Writing the ten slips, 0 to 9.');
+    const writing = [];
+    for (let d = 0; d < 10 && !tok.skipped; d++) {
+      writing.push(writeSheet(sheets[d], d, 400));
+      Sound.rustle(0.16, 0.05);
+      await nap(420);
+    }
+    if (!tok.skipped) await Promise.race([Promise.all(writing), nap(1200)]);
+    if (!tok.skipped) {
+      const p = $('#prepStatus'); if (p) p.textContent = 'Folding each slip twice, so the number is hidden.';
+      await nap(250);
+      const folds = sheets.map((el, i) => nap(i * 70).then(() => (tok.skipped ? null : foldSheet(el, 280))));
+      Sound.rustle(0.4, 0.09);
+      await Promise.race([Promise.all(folds), nap(2000)]);
+    }
+    hands.classList.remove('gone'); stage.classList.remove('prep');
+    if (!tok.skipped) {
+      const p = $('#prepStatus'); if (p) p.textContent = 'Cupping the folded slips in your hands.';
+      await nap(200);
+      const flights = sheets.map((el, i) => nap(i * 60).then(() => (tok.skipped ? null : flyToHands(el, 620))));
+      await Promise.race([Promise.all(flights), nap(1800)]);
+    }
+    sheets.forEach((el) => el.remove());
+    R.prep = null; R.prepared = true;
+  }
+
+  /* ---------------- Ritual flow ---------------- */
+  function setState(s) {
+    R.state = s;
+    stage.classList.toggle('intro', s === 'intro');
+    stage.classList.toggle('done', s === 'complete');
+    stage.classList.toggle('gesture', s === 'pray' || s === 'unfolded' || (s === 'landed' && R.awaitThrow));
+    stage.classList.toggle('reading', s === 'unfolded');
+    if (s !== 'pray') setHandsTilt(0);
+    renderPanel(); renderSlots(); syncMotionMode();
+  }
+  // Detectors only run while the altar is on screen, so moving the phone while reading
+  // History or the Journal never advances the ritual.
+  function syncMotionMode() {
+    if (R.inputMode !== 'motion' || currentView !== 'seek') { Motion.set('idle'); return; }
+    if (R.state === 'pray') Motion.set('bow', { bow: () => doBow('motion'), tilt: setHandsTilt });
+    else if (canThrow()) Motion.set('toss', { toss: () => doThrow() });
+    else Motion.set('idle');
+  }
+  const canThrow = () => R.state === 'unfolded' || (R.state === 'landed' && R.awaitThrow);
+
+  function resetStage() {
+    slipEl.hidden = true; verdict.hidden = true;
+    $$('.sheet', stage).forEach((el) => el.remove()); R.sheet = null;
+    $('#poolCount').textContent = '10 slips';
+    hands.classList.remove('away', 'gone');
+    placeBlocksAtRest();
+  }
+  // In motion mode the drawn hands follow the phone's tilt while praying.
+  let tiltRaf = 0, tiltVal = 0;
+  function setHandsTilt(d) {
+    tiltVal = d;
+    if (tiltRaf) return;
+    tiltRaf = requestAnimationFrame(() => {
+      tiltRaf = 0;
+      const v = Math.max(-30, Math.min(30, tiltVal));
+      hands.style.setProperty('--hy', (Math.abs(v) * 0.8).toFixed(1));
+      hands.style.setProperty('--hr', (-v * 0.22).toFixed(2));
+    });
+  }
+
+  function setInput(ok, why) {
+    R.inputMode = ok ? 'motion' : 'touch';
+    R.motionWhy = ok ? '' : why;
+    Motion.enable(ok);
+  }
+
+  // Runs from the Begin tap. The permission request and wake lock are started before any
+  // await, because iOS only prompts during the tap itself.
+  function begin() {
+    if (R.busy || !store.get('adult', false) && !$('#age18')?.checked) return;
+    Sound.unlock();
+    const wantMotion = settings.input === 'motion' || (settings.input === 'auto' && !inFrame);
+    const perm = wantMotion ? Motion.request() : Promise.resolve('off');
+    keepAwake();
+    R.busy = true;
+    const b = panel.querySelector('[data-act="begin"]');
+    if (b && wantMotion) { b.setAttribute('aria-disabled', 'true'); b.lastChild.textContent = 'Checking motion…'; }
+    (async () => {
+      const st = await perm;
+      let ok = false, why = st;
+      if (st === 'granted') { const p = await Motion.probe(1500); ok = p.status === 'live'; why = p.status; }
+      setInput(ok, why);
+      R.busy = false;
+      R.pos = 0; R.digits = []; R.log = [[], [], [], []]; R.startedAt = Date.now();
+      resetStage();
+      stage.classList.remove('intro');
+      await new Promise(requestAnimationFrame);
+      if (!R.prepared) await prepareSlips();
+      startPray();
+      announce(R.inputMode === 'motion' ? 'Motion is on. Bow with the phone to pray for digit 1.' : 'Tap Bow to pray for digit 1.');
+    })();
+  }
+
+  function startPray() {
+    resetStage();
+    R.bows = 0; R.fallAt = 3 + rand.int(3); R.streak = 0; R.digit = null; R.awaitThrow = false;
+    setState('pray');
+  }
+
+  function doBow(source) {
+    if (R.state !== 'pray' || R.busy) return;
+    R.bows++;
+    hands.classList.remove('bow', 'rattle'); void hands.getBoundingClientRect();
+    hands.classList.add(source === 'motion' ? 'rattle' : 'bow', 'rattle');
+    Sound.rustle(0.22, 0.12); buzz(15);
+    if (R.bows >= R.fallAt) { dropSlip(); return; }
+    const m = panel.querySelector('.meter');
+    if (m) {
+      m.innerHTML = Array.from({ length: Math.max(3, R.bows) }, (_, i) => `<i class="${i < R.bows ? 'on' : ''}"></i>`).join('') + `<span>${R.bows} ${R.bows === 1 ? 'bow' : 'bows'}</span>`;
+      m.setAttribute('aria-label', `${R.bows} bows`);
+    }
+  }
+
+  async function dropSlip() {
+    R.busy = true;
+    R.digit = rand.int(10);
+    R.log[R.pos].push({ digit: R.digit, throws: [], kept: false });
+    $('#poolCount').textContent = '9 slips';
+    await wait(reduceMotion ? 0 : 320);
+    const { w } = sz(), ty = tableY();
+    const sb = stage.getBoundingClientRect(), pk = peekPoint();
+    const x0 = pk.x - sb.left - 15, y0 = pk.y - sb.top - 19;
+    const x1 = w / 2 - 15 + (rand.float() * 60 - 30), y1 = ty + 30;
+    slipEl.hidden = false;
+    Sound.rustle(0.3, 0.2);
+    const anim = slipEl.animate([
+      { transform: `translate(${x0}px, ${y0}px) rotate(0deg) scale(0.5)` },
+      { transform: `translate(${x0 + (x1 - x0) * 0.3}px, ${y0 + 6}px) rotate(40deg) scale(0.8)`, offset: 0.25, easing: 'cubic-bezier(.3,0,.8,.6)' },
+      { transform: `translate(${(x0 + x1) / 2}px, ${y1 - 30}px) rotate(160deg) scale(1)`, offset: 0.7 },
+      { transform: `translate(${x1}px, ${y1 - 8}px) rotate(196deg)`, offset: 0.86 },
+      { transform: `translate(${x1}px, ${y1}px) rotate(188deg)` },
+    ], { duration: reduceMotion ? 1 : 900, easing: 'cubic-bezier(.35,.0,.5,1)', fill: 'forwards' });
+    await anim.finished.catch(() => {});
+    slipEl.style.transform = `translate(${x1}px, ${y1}px) rotate(188deg)`;
+    anim.cancel();
+    Sound.clack(0, 2.2, 0.08); buzz(25);
+    R.busy = false;
+    setState('fallen');
+    announce('A slip has fallen. Unfold it to read the digit.');
+    if (R.inputMode === 'motion') { await wait(900); if (R.state === 'fallen' && currentView === 'seek') unfold(); }
+  }
+
+  async function unfold() {
+    if (R.state !== 'fallen' || R.busy) return;
+    R.busy = true;
+    const { h } = sz();
+    const PH = Math.round(Math.min(190, h * 0.5)), PW = Math.round(PH * 150 / 190);
+    const el = makeSheet(R.digit, PW, PH, 'big written f1 f1done f2');
+    el.querySelector('.pen').remove();
+    el.style.setProperty('--fold-ms', '0ms');
+    stage.appendChild(el); R.sheet = el;
+    // Lift the folded slip from where it lies on the altar, then open it fold by fold.
+    const sr = slipEl.getBoundingClientRect(), er = el.getBoundingClientRect();
+    const dx = sr.left + sr.width / 2 - (er.left + PW / 4), dy = sr.top + sr.height / 2 - (er.top + PH * 0.75);
+    slipEl.hidden = true;
+    hands.classList.add('away');
+    Sound.rustle(0.35, 0.22);
+    if (!reduceMotion) {
+      await el.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${(sr.width / (PW / 2)).toFixed(3)}) rotate(8deg)` }, { transform: 'none' }],
+        { duration: 460, easing: 'cubic-bezier(.2,.8,.3,1)' }).finished.catch(() => {});
+    }
+    Sound.rustle(0.25, 0.12);
+    await unfoldSheet(el, 300);
+    placeBlocksHeld();
+    R.busy = false; R.streak = 0;
+    setState('unfolded');
+    announce(`The slip reads ${R.digit}. Throw the moon blocks to ask if it is right.`);
+  }
+
+  async function doThrow() {
+    if (!(R.state === 'unfolded' || (R.state === 'landed' && R.awaitThrow)) || R.busy) return;
+    R.busy = true; R.awaitThrow = false;
+    verdict.hidden = true;
+    setState('throwing');
+    // Each block lands flat side up or round side up with even odds.
+    const fl = rand.float() < 0.5, fr = rand.float() < 0.5;
+    const outcome = fl && fr ? 'xiao' : (!fl && !fr ? 'yin' : 'sheng');
+    await animateToss(fl, fr);
+    if (outcome === 'xiao') await rockBlocks();
+    R.lastOutcome = outcome;
+    const entry = R.log[R.pos][R.log[R.pos].length - 1];
+    entry.throws.push(outcome);
+    R.streak = outcome === 'sheng' ? R.streak + 1 : 0;
+    showVerdict(outcome);
+    announce(`${OUTCOME[outcome].en}. ${sayFor(outcome)}`);
+    if (outcome === 'sheng') {
+      if (R.streak >= settings.need) {
+        entry.kept = true;
+        R.busy = false;
+        setState('landed');
+        await wait(reduceMotion ? 300 : 1300);
+        acceptDigit();
+        return;
+      }
+      R.awaitThrow = true;
+    } else if (outcome === 'xiao') {
+      R.awaitThrow = true;
+    } else {
+      R.busy = false;
+      setState('landed');
+      await wait(reduceMotion ? 300 : 1500);
+      await returnSlip();
+      startPray();
+      return;
+    }
+    R.busy = false;
+    setState('landed');
+  }
+
+  function showVerdict(kind) {
+    const o = OUTCOME[kind];
+    verdict.dataset.kind = kind;
+    $('#verdictCn').textContent = o.cn;
+    $('#verdictEn').textContent = o.en;
+    $('#streak').innerHTML = settings.need === 3 ? [0, 1, 2].map((i) => `<i class="${i < R.streak ? 'on' : ''}"></i>`).join('') : '';
+    verdict.hidden = false;
+    verdict.classList.remove('show'); void verdict.offsetWidth; verdict.classList.add('show');
+    if (R.sheet) R.sheet.classList.add('hide');
+    if (kind === 'sheng') { buzz([30, 50, 30]); }
+    else buzz(40);
+  }
+
+  async function animateToss(flatL, flatR) {
+    const { w } = sz(), ty = tableY();
+    const blocks = [[blockL, flatL, -1], [blockR, flatR, 1]];
+    if (R.sheet) R.sheet.classList.add('hide');
+    const runs = blocks.map(([el, flat, side]) => {
+      const x0 = Number(el.dataset.x), y0 = Number(el.dataset.y), r0 = Number(el.dataset.r);
+      const { h } = sz();
+      const xf = w / 2 - 27 + side * (34 + rand.float() * 30), yf = ty + 8 + rand.float() * Math.max(0, h - ty - 96);
+      const rf = side * (20 + rand.float() * 70) + (rand.float() < 0.5 ? 180 : 0);
+      const peak = Math.max(10, ty - 220 - rand.float() * 40);
+      el.classList.remove('show-flat', 'show-round'); el.classList.add('spin');
+      const a = el.animate([
+        { transform: `translate(${x0}px, ${y0}px) rotate(${r0}deg)` },
+        { transform: `translate(${(x0 + xf) / 2}px, ${peak}px) rotate(${r0 + side * 300}deg)`, offset: 0.42, easing: 'cubic-bezier(.3,0,.7,1)' },
+        { transform: `translate(${xf}px, ${yf}px) rotate(${rf - side * 30}deg)`, offset: 0.76, easing: 'ease-out' },
+        { transform: `translate(${xf + side * 6}px, ${yf - 14}px) rotate(${rf - side * 10}deg)`, offset: 0.86, easing: 'ease-in' },
+        { transform: `translate(${xf + side * 8}px, ${yf}px) rotate(${rf}deg)` },
+      ], { duration: reduceMotion ? 1 : 1150, easing: 'linear', fill: 'forwards' });
+      setTimeout(() => { el.classList.remove('spin'); el.classList.add(flat ? 'show-flat' : 'show-round'); }, reduceMotion ? 0 : 860);
+      return a.finished.catch(() => {}).then(() => { setXY(el, xf + side * 8, yf, rf); a.cancel(); el.className = 'block ' + (flat ? 'show-flat' : 'show-round'); });
+    });
+    if (!reduceMotion) {
+      setTimeout(() => { Sound.clack(0, 1, 0.5); Sound.clack(0.05, 0.9, 0.4); buzz(30); }, 870);
+      setTimeout(() => { Sound.clack(0, 1.1, 0.25); Sound.clack(0.04, 0.95, 0.2); }, 1150);
+    } else { Sound.clack(0, 1, 0.5); }
+    await Promise.all(runs);
+  }
+
+  // Blocks lying on their round backs (both flat faces up) rock before they settle.
+  async function rockBlocks() {
+    if (reduceMotion) return;
+    await Promise.all([blockL, blockR].map((el, k) => {
+      const x = el.dataset.x, y = el.dataset.y, r = Number(el.dataset.r), a = k ? 9 : -9;
+      return el.animate([0, a, -a * 0.7, a * 0.45, -a * 0.2, 0].map((d) => ({ transform: `translate(${x}px, ${y}px) rotate(${r + d}deg)` })),
+        { duration: 900, easing: 'ease-out' }).finished.catch(() => {});
+    }));
+  }
+
+  // Fold the slip back up and drop it into the hands, so it can be drawn again.
+  async function returnSlip() {
+    verdict.hidden = true;
+    const el = R.sheet; R.sheet = null;
+    if (el) {
+      el.classList.remove('hide');
+      Sound.rustle(0.3, 0.16);
+      await foldSheet(el, 260);
+      hands.classList.remove('away');
+      await flyToHands(el, 560);
+      el.remove();
+    }
+    hands.classList.remove('away');
+    $('#poolCount').textContent = '10 slips';
+  }
+
+  async function acceptDigit() {
+    R.digits[R.pos] = R.digit;
+    renderSlots(); stampSlot(R.pos);
+    Sound.clack(0, 0.6, 0.35);
+    await returnSlip();
+    R.pos++;
+    if (R.pos >= 4) return complete();
+    startPray();
+    announce(`Digit ${R.pos} is ${R.digits[R.pos - 1]}. Pray for digit ${R.pos + 1}.`);
+  }
+
+  function complete() {
+    Sound.bell(); buzz([40, 60, 40, 60, 120]);
+    verdict.hidden = true;
+    hands.classList.remove('away');
+    placeBlocksAtRest();
+    saveToJournal();
+    setState('complete');
+    Motion.set('idle');
+    announce(`Your number is ${R.digits.join(' ')}. Saved to your journal.`);
+    if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  }
+
+  /* ---------------- Touch gestures on the stage ---------------- */
+  let drag = null;
+  stage.addEventListener('pointerdown', (e) => {
+    if (e.target === slipEl) return;
+    drag = { x: e.clientX, y: e.clientY, t: performance.now(), down: false };
+    try { stage.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+  });
+  stage.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const dy = e.clientY - drag.y;
+    if (R.state === 'pray') {
+      if (!drag.down && dy > 36) drag.down = true;
+      if (drag.down && dy < 12) { drag.down = false; drag.y = e.clientY; doBow('drag'); }
+    }
+  });
+  stage.addEventListener('pointerup', (e) => {
+    if (!drag) return;
+    const dy = e.clientY - drag.y, dt = performance.now() - drag.t;
+    if ((R.state === 'unfolded' || (R.state === 'landed' && R.awaitThrow)) && dy < -50 && dt < 700) doThrow();
+    drag = null;
+  });
+  stage.addEventListener('pointercancel', () => { drag = null; });
+  slipEl.addEventListener('click', () => unfold());
+
+  panel.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.name === 'deity') { settings.deity = t.value; saveSettings(); updateTablet(); renderPanel(); }
+    if (t.name === 'need') { settings.need = Number(t.value); saveSettings(); renderPanel(); }
+    if (t.name === 'deity' || t.name === 'need') { const r = panel.querySelector(`input[name="${t.name}"][value="${t.value}"]`); if (r) r.focus({ preventScroll: true }); }
+    if (t.id === 'age18') { store.set('adult', t.checked); const b = panel.querySelector('[data-act="begin"]'); if (b) b.disabled = !t.checked; }
+  });
+  panel.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const act = b.dataset.act;
+    if (act === 'begin') begin();
+    else if (act === 'bow') doBow('button');
+    else if (act === 'unfold') unfold();
+    else if (act === 'throw') doThrow();
+    else if (act === 'again') { R.digits = []; R.pos = 0; R.log = [[], [], [], []]; resetStage(); setState('intro'); requestAnimationFrame(layoutStage); }
+    else if (act === 'skip-prep') skipPrepare();
+    else if (act === 'copy') copyText(R.digits.join(''));
+    else if (act === 'history') { showView('history'); lookup(b.dataset.num); }
+    else if (act === 'use-touch') { settings.input = 'touch'; saveSettings(); setInput(false, 'off'); renderPanel(); syncMotionMode(); }
+    else if (act === 'use-motion') {
+      const perm = Motion.request(); // synchronous inside the tap, for iOS
+      const st = await perm;
+      let ok = false, why = st;
+      if (st === 'granted') { const p = await Motion.probe(1500); ok = p.status === 'live'; why = p.status; }
+      setInput(ok, why);
+      if (ok) { settings.input = 'motion'; saveSettings(); }
+      toast(ok ? 'Motion is on' : (WHY[why] || WHY.off)());
+      renderPanel(); syncMotionMode();
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (currentView !== 'seek' || e.target.closest('input, textarea, select')) return;
+    if (e.key === ' ' && !e.target.closest('button')) {
+      e.preventDefault();
+      if (e.repeat) return;
+      if (R.state === 'pray') doBow('key'); else if (R.state === 'fallen') unfold(); else if (R.state === 'unfolded' || (R.state === 'landed' && R.awaitThrow)) doThrow();
+    }
+  });
+
+  async function copyText(s) {
+    try { await navigator.clipboard.writeText(s); toast(`Copied ${s}`); }
+    catch { toast(`Your number is ${s}`); }
+  }
+
+  function updateTablet() { $('#tablet').textContent = deity().tablet; }
+
+  /* ---------------- Journal ---------------- */
+  function journal() { return store.get('journal', []); }
+  function saveToJournal() {
+    const j = journal();
+    j.unshift({ id: Date.now(), number: R.digits.join(''), deity: settings.deity, need: settings.need, at: Date.now(), log: R.log });
+    store.set('journal', j.slice(0, 200));
+    renderJournal();
+  }
+  function renderJournal() {
+    const list = $('#journalList');
+    const j = journal();
+    if (!j.length) {
+      list.innerHTML = `<li class="card empty"><span class="brush" lang="zh-Hans">录</span><p>No numbers yet. Your first number from the altar will appear here, with how the blocks fell for each digit.</p><a class="btn btn-primary" href="#seek">Ask for a number</a></li>`;
+      return;
+    }
+    list.innerHTML = j.map((e) => {
+      const d = DEITIES.find((x) => x.id === e.deity) || DEITIES[0];
+      const when = new Date(e.at);
+      const st = numberStats(e.number);
+      const sgMs = e.at + 8 * 3600000 - EPOCH;
+      const pickDay = Math.floor(sgMs / DAY) + ((sgMs % DAY) >= 18.5 * 3600000 ? 1 : 0);
+      const after = H.day[LAST] >= pickDay ? checkSince(e.number, pickDay) : null;
+      return `<li class="card jentry" data-id="${e.id}">
+        <span class="num-xl">${e.number}</span>
+        <div class="meta">
+          <b><span class="brush" lang="zh-Hans">${d.cn}</span> ${esc(d.en)}</b>
+          <span class="small muted">${when.toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' })}, ${when.toLocaleTimeString('en-SG', { hour: 'numeric', minute: '2-digit' })} · ${e.need === 3 ? 'three yeses' : 'one yes'} per digit</span>
+          <span class="small muted">Won ${st.occ.length}× since 1986 · ${after || 'awaiting draws after it was received'}</span>
+        </div>
+        <ol class="ritual-log" style="grid-column:1/-1">${(e.log || []).map((p, i) => `<li><b>${e.number[i]}</b><span>${describeLog(p)}</span></li>`).join('')}</ol>
+        <div class="actions">
+          <button type="button" class="btn" data-jact="history">History</button>
+          <button type="button" class="btn" data-jact="copy">Copy</button>
+          <button type="button" class="btn btn-quiet" data-jact="delete">Remove</button>
+        </div>
+      </li>`;
+    }).join('');
+  }
+  function checkSince(numStr, pickDay) {
+    const v = Number(numStr);
+    const hits = Array.from(H.occ(v)).filter((i) => H.day[H.drawOf[i]] >= pickDay);
+    if (!hits.length) return 'not drawn since you received it';
+    const i = hits[hits.length - 1];
+    return `drawn since: ${TIER[H.tier(i)]}, ${fmtDay(H.day[H.drawOf[i]], false)}`;
+  }
+  $('#journalList').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-jact]'); if (!b) return;
+    const li = b.closest('[data-id]'); const id = Number(li.dataset.id);
+    const entry = journal().find((x) => x.id === id); if (!entry) return;
+    const act = b.dataset.jact;
+    if (act === 'history') { showView('history'); lookup(entry.number); }
+    else if (act === 'copy') copyText(entry.number);
+    else if (act === 'delete') {
+      if (b.dataset.confirm) { store.set('journal', journal().filter((x) => x.id !== id)); renderJournal(); toast('Removed'); }
+      else { b.dataset.confirm = '1'; b.textContent = 'Tap again to remove'; setTimeout(() => { if (b.isConnected) { delete b.dataset.confirm; b.textContent = 'Remove'; } }, 3000); }
+    }
+  });
+
+  /* ---------------- History view ---------------- */
+  // Honest baselines: every number is compared with what chance alone gives.
+  const BASE = (() => {
+    let min = Infinity, max = 0;
+    for (let v = 0; v < 10000; v++) { const c = H.count(v); if (c < min) min = c; if (c > max) max = c; }
+    const sd = Math.sqrt(H.expected);
+    return { min, max, lo: Math.max(0, Math.round(H.expected - 2 * sd)), hi: Math.round(H.expected + 2 * sd) };
+  })();
+  const pAnyPrize = (k) => 1 - Math.pow(1 - k / 10000, 23); // chance a family of k numbers shows up in one draw
+  const pct = (p) => (p * 100 < 1 ? (p * 100).toFixed(2) : (p * 100).toFixed(1)) + '%';
+  const tierPill = (i) => `<span class="tier-pill tp-${H.tier(i)}">${TIER[H.tier(i)]}</span>`;
+  const whenOf = (i) => `${fmtDay(H.day[H.drawOf[i]])}`;
+
+  function storyHTML(str, full) {
+    const st = numberStats(str);
+    const c = st.byTier, n = st.occ.length;
+    const last = st.occ[0], first = st.occ[n - 1];
+    const since = last != null ? LAST - H.drawOf[last] : null;
+    const latest = H.drawNumbers(LAST).map(pad4);
+    const exactNow = latest.map((x, k) => (x === str ? k : -1)).filter((k) => k >= 0);
+    const famNow = latest.map((x, k) => ({ x, k })).filter((o) => o.x !== str && st.perms.some((p) => p.p === o.x));
+    const tierAt = (k) => TIER[H.tier(H.start[LAST] + k)];
+    const famSize = st.perms.length;
+    return `
+      <div class="card story">
+        <span class="eyebrow">${str} in Singapore Pools history</span>
+        <div class="headline"><span class="num-xl">${n}×</span><p>${n ? `${n === 1 ? 'win' : 'wins'} since 1986` : 'never drawn since 1986'}</p></div>
+        <p class="small muted">A typical number has won about ${H.expected.toFixed(1)} times, and most land between ${BASE.lo} and ${BASE.hi}. Every number from 0000 to 9999 has won at least ${BASE.min} times. Past wins do not change the next draw.</p>
+        <dl class="tiers">
+          <div class="t1"><dt>1st</dt><dd>${c[1]}</dd></div>
+          <div><dt>2nd</dt><dd>${c[2]}</dd></div>
+          <div><dt>3rd</dt><dd>${c[3]}</dd></div>
+          <div><dt>Starter</dt><dd>${c.S}</dd></div>
+          <div><dt>Consol.</dt><dd>${c.C}</dd></div>
+        </dl>
+        ${c.X ? `<p class="small muted">Plus ${c.X} ${c.X === 1 ? 'win' : 'wins'} from early draws (before April 1991) with an unusual number of prizes, whose records do not separate Starter from Consolation.</p>` : ''}
+        ${n ? `<p class="small">First: ${tierPill(first)} ${whenOf(first)}<br>Last: ${tierPill(last)} ${whenOf(last)}${since ? `, ${since.toLocaleString('en-SG')} draws ago` : ', the latest draw'}</p>` : ''}
+        ${full ? stripChart(st.occ) : ''}
+        <p class="small"><strong>Latest draw</strong> (Draw ${H.n}, ${fmtDay(H.day[LAST])}): ${exactNow.length ? `${str} won ${exactNow.map(tierAt).join(' and ')}` : `${str} was not drawn`}${famNow.length ? `; its arrangement ${famNow.map((o) => `${o.x} (${tierAt(o.k)})`).join(', ')} was` : ''}.</p>
+        ${famSize > 1 ? `<p class="small muted">Its ${famSize} arrangements (the numbers an iBet covers) have won ${st.permTotal} times in all; chance alone gives about ${Math.round(famSize * H.expected)}. A family this size turns up in about ${pct(pAnyPrize(famSize))} of draws.</p>` : `<p class="small muted">All four digits are the same, so it has only one arrangement.</p>`}
+        ${full ? `<div class="perm-list">${st.perms.map((p) => `<button type="button" class="perm ${p.p === str ? 'self' : ''}" data-num="${p.p}">${p.p}<small>${p.c}×</small></button>`).join('')}</div>` : ''}
+        ${full && n ? `<div class="table-wrap"><table><thead><tr><th>Draw</th><th>Date</th><th>Prize</th></tr></thead><tbody>${st.occ.map((i) => `<tr><td class="num">${H.drawOf[i] + 1}</td><td>${whenOf(i)}</td><td>${tierPill(i)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+      </div>`;
+  }
+
+  function lookup(str) {
+    $('#lookupInput').value = str;
+    $('#lookupResult').innerHTML = storyHTML(str, true);
+  }
+
+  function stripChart(occ) {
+    const W = 320, H0 = 54, L = 10, Rr = 10, base = 34;
+    const span = H.day[LAST];
+    const x = (d) => L + (d / span) * (W - L - Rr);
+    const color = (t) => t === 1 ? 'var(--gold)' : (t === 2 || t === 3) ? 'var(--copper)' : t === 'S' ? 'var(--paper)' : 'var(--muted)';
+    const ht = (t) => typeof t === 'number' ? 28 : 18;
+    const years = [1990, 2000, 2010, 2020].map((y) => Math.round((Date.UTC(y, 0, 1) - EPOCH) / DAY));
+    const marks = Array.from(occ).map((i) => { const t = H.tier(i), dx = x(H.day[H.drawOf[i]]); return `<rect x="${(dx - 1).toFixed(1)}" y="${base - ht(t)}" width="2" height="${ht(t)}" style="fill:${color(t)}"/>`; }).join('');
+    return `<figure style="margin:0">
+      <svg class="strip" viewBox="0 0 ${W} ${H0}" role="img" aria-label="Timeline of ${occ.length} wins from 1986 to ${dayDate(span).getUTCFullYear()}">
+        <line x1="${L}" x2="${W - Rr}" y1="${base}" y2="${base}" style="stroke:var(--line-strong)" stroke-width="1"/>
+        ${years.map((d, k) => `<line x1="${x(d)}" x2="${x(d)}" y1="${base}" y2="${base + 4}" style="stroke:var(--line-strong)"/><text x="${x(d)}" y="${base + 14}" text-anchor="middle">${1990 + k * 10}</text>`).join('')}
+        <text x="${L}" y="${base + 14}" text-anchor="start">’86</text>
+        ${marks}
+      </svg>
+      <figcaption class="legend"><span><i style="background:var(--gold)"></i>1st</span><span><i style="background:var(--copper)"></i>2nd / 3rd</span><span><i style="background:var(--paper)"></i>Starter</span><span><i style="background:var(--muted)"></i>Consolation (or S / C before 1991)</span></figcaption>
+    </figure>`;
+  }
+
+  $('#lookupForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const v = $('#lookupInput').value.trim();
+    const err = $('#lookupError');
+    const input = $('#lookupInput');
+    if (!/^\d{4}$/.test(v)) { err.hidden = false; err.textContent = 'Enter exactly four digits, for example 0168.'; input.setAttribute('aria-invalid', 'true'); input.focus(); return; }
+    err.hidden = true; input.removeAttribute('aria-invalid'); lookup(v);
+  });
+  $('#lookupInput').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4); });
+  const jumpTo = (str) => { lookup(str); $('#lookupForm').scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' }); };
+  $('#lookupResult').addEventListener('click', (e) => { const b = e.target.closest('[data-num]'); if (b) lookup(b.dataset.num); });
+
+  let shownDraw = LAST;
+  function renderDraw(di, mark) {
+    shownDraw = Math.max(0, Math.min(LAST, di));
+    const nums = H.drawNumbers(shownDraw).map(pad4);
+    const std = nums.length === 23;
+    $('#drawNo').value = shownDraw + 1;
+    $('#drawNo').max = H.n;
+    $('#prevDraw').disabled = shownDraw === 0;
+    $('#nextDrawBtn').disabled = shownDraw === LAST;
+    const btn = (n) => `<button type="button" class="${n === mark ? 'mark' : ''}" data-num="${n}">${n}</button>`;
+    $('#drawBody').innerHTML = `
+      <p><span class="num" style="font-size:1.25rem;color:var(--text)">Draw ${shownDraw + 1}</span> <span class="muted">· ${fmtDay(H.day[shownDraw])}${shownDraw === LAST ? ' · latest in this app' : ''}</span></p>
+      <div class="top3">
+        ${['1st', '2nd', '3rd'].map((t, k) => `<button type="button" class="${nums[k] === mark ? 'mark' : ''}" data-num="${nums[k]}"><small>${t} prize</small><span class="num">${nums[k]}</span></button>`).join('')}
+      </div>
+      ${std ? `
+      <span class="eyebrow">Starter</span><div class="grid5">${nums.slice(3, 13).map(btn).join('')}</div>
+      <span class="eyebrow">Consolation</span><div class="grid5">${nums.slice(13).map(btn).join('')}</div>`
+      : `<span class="eyebrow">Starter and Consolation</span><p class="small muted">A horse-racing era draw (before 6 April 1991), when the number of prizes depended on the race. Its record lists ${nums.length - 3} other winning numbers without separating Starter from Consolation.</p><div class="grid5">${nums.slice(3).map(btn).join('')}</div>`}
+      <p class="small muted">Tap any number to see its history.</p>`;
+  }
+  $('#prevDraw').addEventListener('click', () => renderDraw(shownDraw - 1));
+  $('#nextDrawBtn').addEventListener('click', () => renderDraw(shownDraw + 1));
+  $('#latestDraw').addEventListener('click', () => renderDraw(LAST));
+  $('#drawNo').addEventListener('change', (e) => { const v = Math.round(Number(e.target.value)); if (v >= 1) renderDraw(v - 1); });
+  $('#drawBody').addEventListener('click', (e) => { const b = e.target.closest('[data-num]'); if (b) jumpTo(b.dataset.num); });
+
+  /* --- Dates that matter: an ancestor's birthday or death anniversary --- */
+  function renderDates() {
+    const s = $('#memDate').value; const out = $('#memBody');
+    if (!s) { out.innerHTML = ''; return; }
+    const d = dayFromIso(s), t = dayDate(d);
+    const m = t.getUTCMonth(), dd = t.getUTCDate();
+    const label = `${dd} ${MON[m]}`;
+    const exact = d >= 0 ? H.findDay(d) : -1;
+    const onDay = exact >= 0 && H.day[exact] === d;
+    const same = [];
+    for (let i = 0; i < H.n; i++) { const x = dayDate(H.day[i]); if (x.getUTCMonth() === m && x.getUTCDate() === dd) same.push(i); }
+    const ddmm = String(dd).padStart(2, '0') + String(m + 1).padStart(2, '0');
+    const mmdd = String(m + 1).padStart(2, '0') + String(dd).padStart(2, '0');
+    const asNum = Array.from(new Set([ddmm, mmdd])).map((x) => `<button type="button" class="perm" data-num="${x}">${x}<small>${H.count(Number(x))}×</small></button>`).join('');
+    out.innerHTML = `
+      <p class="small">${onDay ? `There was a draw on ${fmtDay(d)}: Draw ${exact + 1}. <button type="button" class="linklike" data-draw="${exact}">Show its results</button>` : d > H.day[LAST] ? `${fmtDay(d)} is after the latest draw in this app.` : d < 0 ? '4D began on 31 May 1986.' : `There was no draw on ${fmtDay(d)}.`}</p>
+      <span class="eyebrow">1st prizes on ${label} over the years · ${same.length} ${same.length === 1 ? 'draw' : 'draws'}</span>
+      ${same.length ? `<div class="table-wrap" style="max-height:240px"><table><thead><tr><th>Year</th><th>Draw</th><th>1st prize</th></tr></thead><tbody>${same.slice().reverse().map((i) => `<tr><td>${dayDate(H.day[i]).getUTCFullYear()}</td><td class="num">${i + 1}</td><td><button type="button" class="perm" data-num="${pad4(H.num[H.start[i]])}">${pad4(H.num[H.start[i]])}</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="small muted">No 4D draw has fallen on this date yet.</p>'}
+      <span class="eyebrow">The date as a 4D number</span>
+      <div class="perm-list">${asNum}</div>
+      <p class="small muted">Many people buy a meaningful date as day and month. Tap one to see its history.</p>`;
+  }
+  $('#memDate').addEventListener('change', renderDates);
+  $('#memBody').addEventListener('click', (e) => {
+    const n = e.target.closest('[data-num]'); if (n) { jumpTo(n.dataset.num); return; }
+    const dr = e.target.closest('[data-draw]'); if (dr) { renderDraw(Number(dr.dataset.draw)); $('#drawCard').scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' }); }
+  });
+
+  /* --- Altar numbers in the news, checked against the record --- */
+  function renderNews() {
+    const inRange = (str, from, to) => Array.from(H.occ(Number(str))).filter((i) => { const x = isoDay(H.day[H.drawOf[i]]); return x >= from && x <= to; });
+    const famHits = (str, from, to) => permutations(str).flatMap((p) => inRange(p, from, to).map((i) => ({ p, i }))).sort((a, b) => a.i - b.i);
+    const line = (i) => `${tierPill(i)} ${fmtDay(H.day[H.drawOf[i]])}, Draw ${H.drawOf[i] + 1}`;
+    const items = [];
+    const a = inRange('2250', '2025-08-23', '2025-09-21'); // the seventh lunar month of 2025
+    if (a.length) items.push({ num: '2250', story: 'Moon blocks cast at a Hungry Ghost altar in Sembawang, August 2025, as reported in the news.', record: a.map(line).join('<br>') });
+    const b = inRange('7994', '2025-08-01', '2025-09-30'), b0 = Array.from(H.occ(7994)).filter((i) => H.tier(i) === 2 && isoDay(H.day[H.drawOf[i]]) < '2025-01-01').pop();
+    if (b.length) items.push({ num: '7994', story: 'An arrangement of 9497, the number drawn at a Hungry Ghost event in Jurong West, 2025.', record: b.map(line).join('<br>') + (b0 != null ? `<br>Its previous 2nd Prize was in ${MON[dayDate(H.day[H.drawOf[b0]]).getUTCMonth()]} ${dayDate(H.day[H.drawOf[b0]]).getUTCFullYear()}.` : '') });
+    const c = famHits('8497', '2021-08-15', '2021-09-10'), cAll = famHits('8497', '2021-01-01', '2021-12-31');
+    if (c.length) {
+      // Compare with every family of four different digits that year, so one lucky family is seen in context.
+      const fam = new Map();
+      for (let i = 0; i < H.total; i++) {
+        if (!isoDay(H.day[H.drawOf[i]]).startsWith('2021')) continue;
+        const k = pad4(H.num[i]).split('').sort().join('');
+        if (new Set(k).size === 4) fam.set(k, (fam.get(k) || 0) + 1);
+      }
+      const counts = Array.from(fam.values()), avg = counts.reduce((x, y) => x + y, 0) / 210;
+      const asMany = counts.filter((x) => x >= cAll.length).length;
+      items.push({ num: '8497', story: 'Numbers from a Hougang coffeeshop altar in the seventh month of 2021.', record: `Its arrangements came up ${c.length} times between ${fmtDay(H.day[H.drawOf[c[0].i]], false)} and ${fmtDay(H.day[H.drawOf[c[c.length - 1].i]], false)}, and ${cAll.length} times across all of 2021. That year a family of 24 arrangements came up about ${Math.round(avg)} times on average, and ${asMany} of the 210 families did as well as this one or better.` });
+    }
+    const e = inRange('1505', '2024-04-01', '2024-05-31');
+    items.push({ num: '1505', story: 'Widely bet on for the 15 May 2024 leadership handover.', record: e.length ? e.map(line).join('<br>') : 'Not drawn in April or May 2024.' });
+    $('#newsList').innerHTML = items.map((x) => `<li><button type="button" class="perm self" data-num="${x.num}">${x.num}</button><div><p>${x.story}</p><p class="small muted">${x.record}</p></div></li>`).join('');
+  }
+  $('#newsList').addEventListener('click', (e) => { const b = e.target.closest('[data-num]'); if (b) jumpTo(b.dataset.num); });
+
+  const heatCache = {};
+  function renderHeat(f) {
+    $$('#heatFilter button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.f === f)));
+    let data = heatCache[f];
+    if (!data) {
+      const c = [0, 1, 2, 3].map(() => new Array(10).fill(0)); let n = 0;
+      for (let i = 0; i < H.total; i++) {
+        const p = H.posOf[i];
+        if (f === 'top' && p > 2) continue;
+        if (f === 'first' && p > 0) continue;
+        const s = pad4(H.num[i]); n++;
+        for (let k = 0; k < 4; k++) c[k][s.charCodeAt(k) - 48]++;
+      }
+      // Chi-square per place against an even 10% each; 16.92 is the 5% cut-off for 9 degrees of freedom.
+      const chi = c.map((row) => row.reduce((a, o) => a + (o - n / 10) ** 2 / (n / 10), 0));
+      data = heatCache[f] = { c, n, chi };
+    }
+    const places = ['1st digit', '2nd digit', '3rd digit', '4th digit'];
+    let h = '<span></span>' + [...Array(10).keys()].map((d) => `<span class="h">${d}</span>`).join('');
+    data.c.forEach((row, k) => {
+      h += `<span class="r">${places[k]}</span>`;
+      row.forEach((cnt) => {
+        const p = (cnt / data.n) * 100;
+        const a = Math.max(0.06, Math.min(0.9, 0.35 + (p - 10) * 0.22));
+        h += `<span class="c" style="background:rgba(226,179,85,${a.toFixed(2)})" title="${p.toFixed(2)}%">${p.toFixed(1)}</span>`;
+      });
+    });
+    $('#heat').innerHTML = h;
+    const cells = data.c.flat().map((x) => (x / data.n) * 100);
+    const fair = data.chi.every((x) => x < 16.92);
+    $('#heatNote').textContent = `${data.n.toLocaleString('en-SG')} winning numbers counted. Cells range from ${Math.min(...cells).toFixed(1)}% to ${Math.max(...cells).toFixed(1)}%. ${fair ? 'A standard fairness test (chi-square) finds every place consistent with an even draw: there are no hot or cold digits.' : 'At least one place drifts further from 10% than a fair draw usually does, which happens by chance in small samples.'}`;
+  }
+  $('#heatFilter').addEventListener('click', (e) => { const b = e.target.closest('button[data-f]'); if (b) renderHeat(b.dataset.f); });
+
+  /* ---------------- Next draw ---------------- */
+  function renderNextDraw() {
+    const nowSg = sgNowParts();
+    const out = [];
+    for (let i = 0; i < 8 && out.length < 1; i++) {
+      const t = new Date(Date.UTC(nowSg.getUTCFullYear(), nowSg.getUTCMonth(), nowSg.getUTCDate() + i, 18, 30));
+      const wd = t.getUTCDay();
+      if ((wd === 3 || wd === 6 || wd === 0) && t.getTime() > nowSg.getTime()) out.push(t);
+    }
+    const t = out[0];
+    const label = t ? `${WD[t.getUTCDay()]} ${t.getUTCDate()} ${MON[t.getUTCMonth()]}, 6.30pm` : '';
+    $('#nextDraw').innerHTML = `<span>Next 4D draw <b>${label}</b></span><span>Results here up to <b>${fmtDay(H.day[LAST], false)}</b></span>`;
+  }
+
+  /* ---------------- About: block figures ---------------- */
+  function renderAbout() {
+    const fig = (l, r, kind) => `<figure><svg viewBox="0 0 150 110" aria-hidden="true"><use href="#mb-${l}" x="6" y="10" width="64" height="88" transform="rotate(-6 38 54)"/><g transform="translate(146,8) scale(-1,1) rotate(-8 32 44)"><use href="#mb-${r}" width="64" height="88"/></g></svg>
+      <span class="brush" lang="zh-Hans" style="color:var(--${kind === 'sheng' ? 'yes' : kind === 'xiao' ? 'laugh' : 'no'})">${OUTCOME[kind].cn}</span><figcaption>${OUTCOME[kind].en}</figcaption></figure>`;
+    $('#outcomeFigures').innerHTML = [fig('flat', 'flat', 'xiao'), fig('round', 'flat', 'sheng'), fig('round', 'round', 'yin')].join('');
+    $('#outcomeNotes').innerHTML = Object.values(OUTCOME).map((o) => `<li><strong lang="zh-Hans" class="brush" style="font-size:1.15em">${o.cn}</strong> <strong>${o.name}</strong>: ${o.say}</li>`).join('');
+    $('#dataNote').innerHTML = `Every Singapore Pools 4D draw from Draw 1 on ${fmtDay(0)} to Draw ${H.n} on ${fmtDay(H.day[LAST])}: ${H.total.toLocaleString('en-SG')} winning numbers, from a public archive of Singapore Pools results. Results after that date are not in this version. Until 6 April 1991 the 4D result was tied to horse races, so the number of prizes varied: 210 of the 506 draws before then have 17 to 27 winning numbers instead of 23, and their records do not separate Starter from Consolation. Since then every draw has 23: 1st, 2nd, 3rd, 10 Starter and 10 Consolation. Always confirm results with Singapore Pools.`;
+    $('#historyLede').textContent = `Singapore Pools 4D, Draw 1 (${fmtDay(0, false)}) to Draw ${H.n} (${fmtDay(H.day[LAST], false)}). Every number shown is a past result. Each draw is independent.`;
+  }
+
+  /* ---------------- Views / routing ---------------- */
+  const VIEWS = ['seek', 'history', 'journal', 'about'];
+  let currentView = 'seek';
+  function showView(v) {
+    if (!VIEWS.includes(v)) v = 'seek';
+    currentView = v;
+    VIEWS.forEach((x) => { $('#' + x).hidden = x !== v; });
+    $$('.rail a').forEach((a) => { if (a.dataset.view === v) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    if (location.hash.slice(1) !== v) { try { history.replaceState(null, '', '#' + v); } catch { /* ignore */ } }
+    if (v === 'journal') renderJournal();
+    if (v === 'seek') requestAnimationFrame(layoutStage);
+    syncMotionMode();
+    if (v === 'seek' && R.state === 'fallen' && R.inputMode === 'motion' && !R.busy) setTimeout(() => { if (currentView === 'seek') unfold(); }, 600);
+    window.scrollTo(0, 0);
+  }
+  $$('.rail a').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); showView(a.dataset.view); }));
+  window.addEventListener('hashchange', () => showView(location.hash.slice(1)));
+
+  /* ---------------- Sound toggle ---------------- */
+  const soundBtn = $('#soundBtn');
+  const syncSound = () => { soundBtn.setAttribute('aria-pressed', String(Sound.on)); soundBtn.setAttribute('aria-label', Sound.on ? 'Sound on' : 'Sound off'); soundBtn.querySelector('.wave').style.display = Sound.on ? '' : 'none'; };
+  soundBtn.addEventListener('click', () => { Sound.on = !Sound.on; syncSound(); });
+
+  /* ---------------- Incense smoke ---------------- */
+  function smoke() {
+    const cv = $('#smoke'); const ctx = cv.getContext('2d');
+    const puff = document.createElement('canvas'); puff.width = puff.height = 64;
+    const pc = puff.getContext('2d'), pg = pc.createRadialGradient(32, 32, 0, 32, 32, 32);
+    pg.addColorStop(0, 'rgba(232, 218, 204, 0.55)'); pg.addColorStop(0.5, 'rgba(232, 218, 204, 0.18)'); pg.addColorStop(1, 'rgba(232, 218, 204, 0)');
+    pc.fillStyle = pg; pc.fillRect(0, 0, 64, 64);
+    let parts = [], last = 0, run = !reduceMotion;
+    const resize = () => { const r = window.devicePixelRatio || 1; cv.width = stage.clientWidth * r; cv.height = stage.clientHeight * r; ctx.setTransform(r, 0, 0, r, 0, 0); };
+    resize(); window.addEventListener('resize', resize);
+    const urn = () => { const w = stage.clientWidth; return { x: w - 18 - 32, y: tableY() - 58 }; };
+    function frame(t) {
+      if (!run) return;
+      if (currentView === 'seek' && !document.hidden) {
+        const dt = Math.min(50, t - last || 16); last = t;
+        const u = urn();
+        if (parts.length < 60 && Math.random() < 0.5) [-12, 0, 12].forEach((dx, k) => parts.push({ x: u.x + dx + (k === 1 ? 0 : dx * 0.33), y: u.y + (k === 1 ? 0 : 4), vx: (Math.random() - 0.5) * 0.08, vy: -0.025 - Math.random() * 0.02, life: 0, max: 2600 + Math.random() * 1800, ph: Math.random() * 6.28 }));
+        ctx.globalAlpha = 1; ctx.clearRect(0, 0, stage.clientWidth, stage.clientHeight);
+        parts = parts.filter((p) => p.life < p.max);
+        for (const p of parts) {
+          p.life += dt; p.ph += dt * 0.0016;
+          p.x += (p.vx + Math.sin(p.ph) * 0.04) * dt; p.y += p.vy * dt;
+          const k = p.life / p.max, r = 4 + k * 22;
+          ctx.globalAlpha = (1 - k) * 0.22 * Math.min(1, p.life / 300);
+          ctx.drawImage(puff, p.x - r, p.y - r, r * 2, r * 2);
+        }
+      }
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function layoutStage() {
+    if (R.state === 'intro' || R.state === 'pray' || R.state === 'complete' || R.state === 'fallen') placeBlocksAtRest();
+    else if (R.state === 'unfolded') placeBlocksHeld();
+  }
+  window.addEventListener('resize', () => { if (currentView === 'seek' && !R.busy) layoutStage(); });
+
+  /* ---------------- Boot ---------------- */
+  const inFrame = (() => { try { return window.self !== window.top; } catch { return true; } })();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && R.state !== 'intro' && R.state !== 'complete') keepAwake(); });
+
+  updateTablet(); syncSound(); renderNextDraw(); renderAbout(); setState('intro');
+  renderDraw(LAST); renderHeat('all'); renderJournal(); renderNews();
+  $('#memDate').value = isoDay(Math.floor((Date.now() + 8 * 3600000 - EPOCH) / DAY)); renderDates();
+  lookup(pad4(H.num[H.start[LAST]]));
+  if (/[?&]debug=1/.test(location.search)) debugOverlay();
+  showView(location.hash.slice(1) || 'seek');
+  placeBlocksAtRest();
+  smoke();
+  window.__HOH = { H, R, numberStats, permutations, rand, Motion }; // for testing
+
+  // ?debug=1 shows live sensor values, for tuning the bow and toss thresholds on a phone.
+  function debugOverlay() {
+    const el = document.createElement('pre');
+    el.style.cssText = 'position:fixed;left:8px;top:calc(8px + env(safe-area-inset-top,0px));z-index:40;margin:0;padding:6px 8px;border-radius:6px;background:rgba(0,0,0,.75);color:#9f9;font:11px/1.3 ui-monospace,monospace;pointer-events:none';
+    document.body.appendChild(el);
+    Motion.watch((s) => { el.textContent = `pitch ${s.pitch.toFixed(1)}°\nlin ${s.linMag.toFixed(2)}  rot ${s.rotMag == null ? '–' : s.rotMag.toFixed(0)}\nmode ${R.inputMode} · state ${R.state} · bows ${R.bows}`; });
+  }
+})();
+</script>

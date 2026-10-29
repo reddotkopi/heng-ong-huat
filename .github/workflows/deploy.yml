@@ -1,0 +1,56 @@
+name: Update draw results and deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # 4D draws are Wed, Sat and Sun at 6.30pm Singapore time; the results archive updates by
+    # noon the next day. Check at 1.20pm and again at 7.20pm SGT on Thu, Sun and Mon.
+    - cron: '20 5 * * 0,1,4'
+    - cron: '20 11 * * 0,1,4'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Refresh draw results
+        run: python3 scripts/update_data.py
+      - name: Save new results
+        run: |
+          if ! git diff --quiet -- data/; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898333+github-actions[bot]@users.noreply.github.com"
+            git add data/
+            git commit -m "Update 4D results to draw $(python3 scripts/update_data.py --last)"
+            git push
+          fi
+      - name: Build the app
+        run: python3 scripts/build.py
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
