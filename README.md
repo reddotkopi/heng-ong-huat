@@ -48,10 +48,10 @@ has the result 20 to 30 minutes later; the archive has it the next morning.
   several starters through the afternoon and hands over to a fresh run before GitHub's 6-hour job
   limit. `deploy.yml` also has three draw-evening runs of its own, as a fallback.
 - **The day after**, at 11.20am and 3.20pm on Thursday, Sunday and Monday, `deploy.yml` checks the
-  confirmed archive. A confirmed draw replaces the provisional one. If any of its top three prizes
-  differ, the app uses the confirmed result and a correction alert goes out.
+  confirmed archive. A confirmed draw replaces the provisional one.
 
-Scheduled and watcher runs only redeploy the site when the results changed. Both feeds are read at
+Scheduled and watcher runs redeploy the site when it differs from what they would build: new
+results, or an earlier run whose deploy failed (its alert is then sent too). Both feeds are read at
 their latest commit, because raw.githubusercontent.com can serve a file up to 5 minutes old. GitHub
 disables scheduled workflows in a public repository after 60 days without activity; it is not
 documented whether the automatic result commits count, so if the Actions tab shows a workflow as
@@ -70,6 +70,14 @@ appear without reinstalling. It tells you if a number in your journal came up.
 Otherwise it keeps the stored results and logs a warning. Draws before 6 April 1991 were tied to horse
 races, so 210 of them have 17 to 27 winning numbers, and their records do not separate Starter from
 Consolation.
+
+**When the two sources disagree.** If the archive's 1st, 2nd or 3rd prize for a new draw differs
+from the fast feed's, nothing can tell which is right. The draw is held back: it is taken off the
+site, a "results withdrawn" alert goes out, it is listed in `data/disputed.json`, and the workflow
+run fails so the repository owner is emailed. It clears by itself if either source changes to
+agree. If Singapore Pools shows that the archive is right, add the draw number to `use_archive` in
+`data/disputed.json`; the next run publishes it and sends its alert. If the fast feed corrects a
+draw itself, the app shows the new result and a correction alert goes out.
 
 `scripts/update_live.py` takes a same-evening draw only if it follows on from the archive with no gap,
 is not dated in the future, has 23 four-digit numbers, and lists its Starter and Consolation prizes
@@ -107,8 +115,10 @@ How it behaves:
 
 - Alerts are opt-in, from the **Result alerts** card on the History tab. OneSignal's code is loaded only
   after someone turns alerts on. It runs in its own service worker under `push/`, apart from the
-  app's offline cache. OneSignal receives the phone's push address, browser type, language, time
-  zone and IP address, and whether alerts are opened; nothing from the journal.
+  app's offline cache. When alerts are turned on or off, and about once a week while they are on,
+  OneSignal receives the phone's push address, IP address, device and browser version, language and
+  time zone, and it learns whether alerts are opened. It gets nothing from the journal. Turning
+  alerts off also drops the phone's push subscription, so it works offline too.
 - On iPhone and iPad, alerts need iOS 16.4 or later and the app added to the home screen. In a
   Safari tab the card explains this.
 - One alert per new draw: `4D Draw 5555 results (provisional)` with the top three prizes. If the

@@ -39,10 +39,14 @@ server.listen(0, async () => {
   check(/Provisional/.test(await p.textContent('#drawBody')), 'draw card shows the Provisional badge');
   await p.screenshot({ path: path.join(__dirname, 'shots', 'live-provisional.png') });
   await p.click('.rail a[data-view="journal"]'); await p.waitForTimeout(200);
-  check(/drawn since: Consolation/.test(await p.textContent('#journalList')), 'journal shows the number drawn since it was received');
-  // the archive confirms draw 5555 with a different consolation list: confirmed replaces provisional
+  check(/drawn since: Consolation, 31 Oct 2026 \(provisional\)/.test(await p.textContent('#journalList')), 'journal shows the number drawn since it was received, marked provisional');
+  // the archive confirms draw 5555 with a different consolation list: confirmed replaces provisional,
+  // and the journal holder is told their number is not among the results after all
   const conf = { ...prov, numbers: [...nums.slice(0, 22), '7308'], confirmed: true };
+  await p.evaluate(() => { document.querySelector('#toast').textContent = ''; });
   await p.evaluate((d) => window.__HOH.applyLive([d], true), conf);
+  const t3 = await p.textContent('#toast');
+  check(/Draw 5555 results were corrected: your number 7307 is not among them after all/.test(t3), `correction tells the journal holder: "${t3}"`);
   const st2 = await p.evaluate(() => ({ n: window.__HOH.H.n, conf: window.__HOH.H.confirmed, has: window.__HOH.numberStats('7307').occ.length, has2: window.__HOH.numberStats('7308').occ.length }));
   check(st2.n === 5555 && st2.conf === 5555, `confirmed draw replaces provisional (confirmed ${st2.conf})`);
   check(st2.has2 > 0, 'confirmed numbers used after replacement');
@@ -51,6 +55,25 @@ server.listen(0, async () => {
   await p.evaluate(() => window.__HOH.applyLive([{ draw: 5556, date: '2026/11/01', numbers: ['12'], confirmed: false }, { draw: 5558, date: '2026/11/04', numbers: Array(23).fill('0000') }], true));
   check(await p.evaluate(() => window.__HOH.H.n) === before, 'malformed or gapped draws ignored');
   check(errs.length === 0, 'no page errors: ' + errs.join(' | '));
+  // a provisional draw that disappears from latest.json has been withdrawn (sources disagree)
+  {
+    const p3 = await ctx.newPage();
+    latest = { ...original, updated: '2026-10-31T11:00:00Z', draws: [...original.draws, prov] };
+    await p3.goto(url); await p3.waitForTimeout(1000);
+    check(await p3.evaluate(() => window.__HOH.H.n) === 5555, 'provisional 5555 shown');
+    await p3.evaluate(() => { document.querySelector('#toast').textContent = ''; });
+    latest = { ...original, updated: '2026-10-31T12:00:00Z' };
+    await p3.evaluate(() => window.__HOH.fetchLive());
+    await p3.waitForTimeout(300);
+    const tw = await p3.textContent('#toast');
+    check(await p3.evaluate(() => window.__HOH.H.n) === 5554 && /Draw 5555 results were taken down/.test(tw), `withdrawn draw removed and announced: "${tw}"`);
+    // an older copy (say, the offline cache's) does not bring it back
+    latest = { ...original, updated: '2026-10-31T11:00:00Z', draws: [...original.draws, prov] };
+    await p3.evaluate(() => window.__HOH.fetchLive());
+    await p3.waitForTimeout(300);
+    check(await p3.evaluate(() => window.__HOH.H.n) === 5554, 'an older latest.json is ignored');
+    await p3.close();
+  }
   // reopening after results came in (already in the page): told once, then not again
   latest = original; // the site as built: nothing newer to fetch
   const p2 = await ctx.newPage();

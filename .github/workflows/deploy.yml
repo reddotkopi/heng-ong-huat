@@ -32,22 +32,26 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      SITE_URL: https://reddotkopi.github.io/heng-ong-huat/
     outputs:
       deploy: ${{ steps.check.outputs.deploy }}
       notify: ${{ steps.check.outputs.notify }}
+      disputed: ${{ steps.check.outputs.disputed }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main   # the branch as it is now, not as it was when this run was queued
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Note the results already published
+      - name: Note what the live site shows
         run: python3 scripts/notify.py --snapshot "$RUNNER_TEMP/before.json"
       - name: Refresh confirmed results
         run: python3 scripts/update_data.py
       - name: Refresh same-evening results (provisional)
         run: python3 scripts/update_live.py
       - name: Save new results
-        id: save
         run: |
           if [ -n "$(git status --porcelain -- data/)" ]; then
             git config user.name "github-actions[bot]"
@@ -56,27 +60,29 @@ jobs:
             git commit -m "Update 4D results: $(python3 scripts/notify.py --describe)"
             git pull --rebase origin main
             git push origin HEAD:main
-            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
+      - name: Build the app
+        env:
+          ONESIGNAL_APP_ID: ${{ vars.ONESIGNAL_APP_ID }}
+        run: python3 scripts/build.py
       - name: Decide what to publish
         id: check
         env:
           EVENT: ${{ github.event_name }}
           ONLY_IF_CHANGED: ${{ inputs.only_if_changed }}
-          CHANGED: ${{ steps.save.outputs.changed }}
         run: |
-          # Scheduled and watcher runs only redeploy when the results changed.
-          if [ "$CHANGED" = true ] || { [ "$EVENT" != schedule ] && [ "$ONLY_IF_CHANGED" != true ]; }; then
+          # Scheduled and watcher runs deploy when the live site differs from this build: new
+          # results, or an earlier run whose deploy failed. Pushes and manual runs always deploy.
+          live=$(curl -fsS -H 'Cache-Control: no-cache' "${SITE_URL}version.txt?t=$(date +%s)" || true)
+          if [ "$live" != "$(cat site/version.txt)" ] || { [ "$EVENT" != schedule ] && [ "$ONLY_IF_CHANGED" != true ]; }; then
             echo "deploy=true" >> "$GITHUB_OUTPUT"
             python3 scripts/notify.py --diff "$RUNNER_TEMP/before.json"
           else
-            echo "no new results"
+            echo "the live site is up to date"
           fi
-      - name: Build the app
-        if: steps.check.outputs.deploy == 'true'
-        env:
-          ONESIGNAL_APP_ID: ${{ vars.ONESIGNAL_APP_ID }}
-        run: python3 scripts/build.py
+          if [ -n "$(python3 scripts/update_data.py --disputed)" ]; then
+            echo "disputed=true" >> "$GITHUB_OUTPUT"
+          fi
       - if: steps.check.outputs.deploy == 'true'
         uses: actions/configure-pages@v5
       - if: steps.check.outputs.deploy == 'true'
@@ -115,3 +121,14 @@ jobs:
           ONESIGNAL_REST_API_KEY: ${{ secrets.ONESIGNAL_REST_API_KEY }}
           ONESIGNAL_SEGMENT: ${{ vars.ONESIGNAL_SEGMENT }}
         run: python3 scripts/notify.py --send
+
+  # The archive and the fast feed disagree on a draw: it is withdrawn from the site until they
+  # agree. Fail the run so the repository owner is emailed (see data/disputed.json and README).
+  disputed:
+    needs: [build, deploy, notify]
+    if: always() && needs.build.outputs.disputed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "::error::The two results sources disagree on the top three prizes of a draw, so it is held back. See data/disputed.json and the README."
+          exit 1

@@ -8,13 +8,22 @@ The new file replaces the old one only if it passes every check:
   - its 1st, 2nd and 3rd prizes agree with a second, independent feed wherever both have the draw
 Otherwise the old file is kept and a warning is printed, so the site still builds.
 
+When the two sources disagree on a draw not yet stored, nobody can tell which is right, so the
+draw is recorded in data/disputed.json and held back: update_live.py withdraws it from the site,
+an alert says so, and the workflow run fails so the maintainer hears about it. It clears by itself
+if either source changes to agree. To accept the archive's result instead, add the draw number to
+"use_archive" in data/disputed.json.
+
   python3 scripts/update_data.py          refresh (exit 0 even when the source is unusable)
   python3 scripts/update_data.py --last   print the latest draw in the current file
+  python3 scripts/update_data.py --disputed   print the draws held back because the sources disagree
 """
 import csv, datetime, io, json, pathlib, re, subprocess, sys, time, urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DATA = ROOT / 'data' / 'sp_4d_prizes.csv'
+DISPUTES = ROOT / 'data' / 'disputed.json'
+UPDATED = ROOT / 'data' / 'updated.txt'
 SOURCE = 'https://raw.githubusercontent.com/playingmeow/SingaporePools/main/4d_prizes.csv'
 CROSSCHECK = 'https://raw.githubusercontent.com/darrentan90/hobeh-draws/main/latest.json'
 HEADER = ['draw_number', 'number', 'date']
@@ -82,12 +91,33 @@ def parse(text):
     return draws
 
 
-def crosscheck(draws):
+def load_disputes():
+    try:
+        d = json.loads(DISPUTES.read_text())
+        return {'draws': {int(k): v for k, v in d.get('draws', {}).items()}, 'use_archive': [int(x) for x in d.get('use_archive', [])]}
+    except (OSError, ValueError, AttributeError):
+        return {'draws': {}, 'use_archive': []}
+
+
+def save_disputes(d):
+    out = {'draws': {str(k): v for k, v in sorted(d['draws'].items())}, 'use_archive': sorted(d['use_archive'])}
+    if not DISPUTES.exists() or json.loads(DISPUTES.read_text() or '{}') != out:
+        DISPUTES.write_text(json.dumps(out, indent=1) + '\n')
+
+
+def stamp():
+    """Record when the published results last changed (the app ignores older copies)."""
+    UPDATED.write_text(datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ') + '\n')
+
+
+def crosscheck(draws, stored):
     try:
         feed = json.loads(fetch(CROSSCHECK))['fourD']
     except Exception as e:
         warn(f'cross-check feed unavailable ({e}); skipping it')
         return
+    disputes = load_disputes()
+    found = {}
     checked = 0
     for e in feed:
         n = e.get('draw_no')
@@ -96,10 +126,22 @@ def crosscheck(draws):
         ours = draws[n]['nums'][:3]
         theirs = [e['first'], e['second'], e['third']]
         if ours != theirs:
-            raise ValueError(f'draw {n}: top three {ours} disagree with the cross-check feed {theirs}')
+            if n <= stored:
+                raise ValueError(f'draw {n}: top three {ours} disagree with the cross-check feed {theirs}')
+            if n in disputes['use_archive']:
+                warn(f"draw {n}: the archive's top three {ours} differ from the fast feed's {theirs}; using the archive, as data/disputed.json says")
+            else:
+                found[n] = {'archive': ours, 'feed': theirs}
+            continue
         if draws[n]['date'].replace('/', '-') != e['draw_date']:
             raise ValueError(f"draw {n}: date {draws[n]['date']} disagrees with the cross-check feed {e['draw_date']}")
         checked += 1
+    disputes['draws'] = found
+    save_disputes(disputes)
+    if found:
+        raise ValueError('the archive and the fast feed disagree on the top three of draw '
+                         + ', '.join(f"{n} (archive {v['archive']}, feed {v['feed']})" for n, v in found.items())
+                         + '; held back until they agree (see data/disputed.json)')
     print(f'cross-checked the top three prizes of {checked} draws')
 
 
@@ -109,6 +151,9 @@ def last(draws):
 
 
 def main():
+    if '--disputed' in sys.argv:
+        print(' '.join(map(str, sorted(load_disputes()['draws']))))
+        return
     old = parse(DATA.read_text())
     if '--last' in sys.argv:
         k, d = last(old)
@@ -122,7 +167,7 @@ def main():
         for k, d in old.items():
             if new[k] != d:
                 raise ValueError(f'source changed the already-stored draw {k}')
-        crosscheck(new)
+        crosscheck(new, max(old))
     except Exception as e:
         warn(f'kept the existing results: {e}')
         return
@@ -130,6 +175,7 @@ def main():
         print(f'no new draws; latest is {last(old)[0]} ({last(old)[1]})')
         return
     DATA.write_text(text if text.endswith('\n') else text + '\n')
+    stamp()
     print(f'added draws {max(old) + 1} to {max(new)}; latest is {last(new)[1]}')
 
 

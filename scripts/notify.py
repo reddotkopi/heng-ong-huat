@@ -1,12 +1,16 @@
 """Result alerts: tell people who turned them on when new 4D results are published.
 
-The update job notes what is published before refreshing the data, compares afterwards, and
-sends one web push through OneSignal for each change worth knowing about:
+The update job notes what the live site shows before refreshing the data (so a deploy that
+failed is retried, alert included, by the next run), compares afterwards, and sends one web push
+through OneSignal for each change worth knowing about:
   - a new draw (the newest one, when several arrive together), provisional or confirmed
   - a correction, when the 1st, 2nd or 3rd prize of a provisional draw changes (the confirmed
     archive differs, or the fast feed corrected itself)
+  - a withdrawal, when a provisional draw is taken down because the two sources disagree
 
-  python3 scripts/notify.py --snapshot FILE   save the top three prizes of the published draws
+  python3 scripts/notify.py --snapshot FILE   save the top three prizes of the draws the live site
+                                              shows (its latest.json), or of the repo's data if the
+                                              site cannot be reached
   python3 scripts/notify.py --diff FILE       compare with FILE; writes notify=<json> to $GITHUB_OUTPUT
   python3 scripts/notify.py --describe        one line about the published results, for commit messages
   python3 scripts/notify.py --send            send $NOTIFY (from --diff) to subscribers; needs
@@ -38,6 +42,14 @@ def published():
     return out
 
 
+def served(url=None):
+    """The same shape as published(), from the live site's latest.json."""
+    url = (url or os.environ.get('SITE_URL') or SITE_URL).rstrip('/') + f'/latest.json?t={int(time.time())}'
+    with urllib.request.urlopen(urllib.request.Request(url, headers={'Cache-Control': 'no-cache'}), timeout=30) as r:
+        draws = json.loads(r.read())['draws']
+    return {d['draw']: {'date': d['date'], 'top': d['numbers'][:3], 'confirmed': bool(d.get('confirmed', True))} for d in draws}
+
+
 def changes(before, after):
     msgs = []
     newest = max(before) if before else 0
@@ -45,14 +57,21 @@ def changes(before, after):
     if added:
         k = added[-1]
         msgs.append(dict(after[k], kind='new', draw=k, count=len(added)))
-    for k in sorted(set(before) & set(after)):
-        if not before[k]['confirmed'] and before[k]['top'] != after[k]['top']:
+    for k in sorted(before):
+        if before[k]['confirmed']:
+            continue
+        if k not in after:
+            msgs.append(dict(before[k], kind='withdrawn', draw=k))
+        elif before[k]['top'] != after[k]['top']:
             msgs.append(dict(after[k], kind='correction', draw=k, was=before[k]['top']))
     return msgs
 
 
 def message(m):
     top = f"1st {m['top'][0]} · 2nd {m['top'][1]} · 3rd {m['top'][2]}"
+    if m['kind'] == 'withdrawn':
+        return (f"4D Draw {m['draw']} results withdrawn",
+                'Two results sources disagree on this draw, so it has been taken down. Check Singapore Pools for the official results.')
     if m['kind'] == 'correction':
         return (f"Correction: 4D Draw {m['draw']}",
                 f"{'Confirmed' if m['confirmed'] else 'Corrected'} results: {top}. The results sent earlier were wrong.")
@@ -133,7 +152,13 @@ def send(msgs):
 def main():
     args = sys.argv[1:]
     if args[:1] == ['--snapshot']:
-        pathlib.Path(args[1]).write_text(json.dumps(published()))
+        try:
+            snap = served()
+            print(f'live site shows draws up to {max(snap)}')
+        except Exception as e:
+            print(f'::warning::could not read the live site ({e}); comparing with the repo instead')
+            snap = published()
+        pathlib.Path(args[1]).write_text(json.dumps(snap))
     elif args[:1] == ['--diff']:
         before = {int(k): v for k, v in json.loads(pathlib.Path(args[1]).read_text()).items()}
         msgs = changes(before, published())

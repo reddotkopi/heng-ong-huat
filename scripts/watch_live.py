@@ -20,6 +20,7 @@ import datetime, json, os, pathlib, sys, time
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'scripts'))
 from update_data import CROSSCHECK, DATA, fetch, parse, pinned, warn  # noqa: E402
+from update_data import load_disputes  # noqa: E402
 from update_live import LIVE, SGT, provisional  # noqa: E402
 
 DRAW_DAYS = {2, 5, 6}  # Wednesday, Saturday, Sunday
@@ -97,7 +98,7 @@ def main():
         if url != last_url or url == CROSSCHECK:  # new commit (or ls-remote failed: just re-read)
             last_url = url
             try:
-                draws = provisional(read_feed()['fourD'], archive)
+                draws = provisional(read_feed()['fourD'], archive, set(load_disputes()['draws']))
             except Exception as e:
                 warn(f'could not read the fast feed ({e})')
                 draws = []

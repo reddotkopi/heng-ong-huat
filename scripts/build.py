@@ -26,7 +26,10 @@ def main():
     live_path = ROOT / 'data' / 'live.json'
     provisional = json.loads(live_path.read_text())['draws'] if live_path.exists() else []
     last = max(archive)
+    updated = ROOT / 'data' / 'updated.txt'
     latest = {
+        # when the results last changed: the app ignores a copy older than the one it has
+        'updated': updated.read_text().strip() if updated.exists() else '',
         'last_confirmed': last,
         'draws': [{'draw': k, 'date': archive[k]['date'], 'numbers': archive[k]['nums'], 'confirmed': True}
                   for k in range(max(1, last - RECENT + 1), last + 1)]
@@ -111,6 +114,11 @@ if ('serviceWorker' in navigator && window.self === window.top && (location.prot
     if push_app:  # OneSignal's service worker, kept in its own scope apart from sw.js
         (site / 'push').mkdir()
         (site / 'push' / 'OneSignalSDKWorker.js').write_text('importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");\n')
+    # A fingerprint of everything published; the deploy job compares it with the live site's.
+    digest = hashlib.sha256()
+    for f in sorted(x for x in site.rglob('*') if x.is_file()):
+        digest.update(f.relative_to(site).as_posix().encode() + b'\0' + f.read_bytes() + b'\0')
+    (site / 'version.txt').write_text(digest.hexdigest()[:16] + '\n')
     print(f"built site/ (draws 1-{meta['draws']}, latest {meta['last_date']}, {sum(not d['confirmed'] for d in latest['draws'])} provisional, alerts {'on' if push_app else 'off'}, cache {version}) and dist/artifact.html")
 
 

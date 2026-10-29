@@ -7,6 +7,8 @@ look cleanly parsed:
   - the Starter and Consolation lists are each in ascending order (the feed sorts them; a
     number out of order means a parsing slip, as happened when a number won two prizes)
   - the draw is not dated in the future (Singapore time)
+A draw the archive and the fast feed disagree on (data/disputed.json, see update_data.py) is
+withdrawn, along with any after it.
 The result goes to data/live.json. A draw already published stays until the archive has it,
 even if a stale copy of the feed no longer lists it; if the feed changes a draw's result, the
 new one is used. Once the archive has a draw, it drops out of live.json and the archive's
@@ -20,7 +22,7 @@ import datetime, json, os, pathlib, sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'scripts'))
-from update_data import DATA, CROSSCHECK, fetch, parse, warn  # noqa: E402
+from update_data import DATA, CROSSCHECK, fetch, load_disputes, parse, stamp, warn  # noqa: E402
 
 LIVE = ROOT / 'data' / 'live.json'
 SGT = datetime.timezone(datetime.timedelta(hours=8))
@@ -30,7 +32,7 @@ def is4(x):
     return isinstance(x, str) and len(x) == 4 and x.isdigit()
 
 
-def provisional(feed, archive):
+def provisional(feed, archive, disputed=()):
     last = max(archive)
     last_date = archive[last]['date'].replace('/', '-')
     today = datetime.datetime.now(SGT).date().isoformat()
@@ -40,6 +42,9 @@ def provisional(feed, archive):
         n = e['draw_no']
         if n != expect:
             warn(f'feed skips from draw {expect - 1} to {n}; stopping there')
+            break
+        if n in disputed:
+            warn(f'draw {n} withheld: the archive and the fast feed disagree on it')
             break
         date, top = e.get('draw_date', ''), [e.get('first'), e.get('second'), e.get('third')]
         st, co = e.get('starters') or [], e.get('consolations') or []
@@ -64,7 +69,7 @@ def provisional(feed, archive):
     return out
 
 
-def merge(old, fresh, last):
+def merge(old, fresh, last, disputed=()):
     byno = {d['draw']: d for d in old if d['draw'] > last}
     for d in fresh:
         had = byno.get(d['draw'])
@@ -72,7 +77,7 @@ def merge(old, fresh, last):
             warn(f"the fast feed changed its result for draw {d['draw']}; publishing the new one")
         byno[d['draw']] = d
     out, n = [], last + 1
-    while n in byno:
+    while n in byno and n not in disputed:
         out.append(byno[n])
         n += 1
     return out
@@ -85,12 +90,13 @@ def main():
         print(json.dumps(provisional(feed, archive)))
         return
     old = json.loads(LIVE.read_text()) if LIVE.exists() else {'draws': []}
+    disputed = set(load_disputes()['draws'])
     try:
-        fresh = provisional(json.loads(fetch(CROSSCHECK))['fourD'], archive)
+        fresh = provisional(json.loads(fetch(CROSSCHECK))['fourD'], archive, disputed)
     except Exception as e:
         warn(f'fast feed unavailable ({e}); keeping the provisional draws already published')
         fresh = []
-    draws = merge(old['draws'], fresh, max(archive))
+    draws = merge(old['draws'], fresh, max(archive), disputed)
     # Draws the archive now has are dropped. Flag any provisional result it contradicts.
     for d in old['draws']:
         if d['draw'] in archive and archive[d['draw']]['nums'][:3] != d['numbers'][:3]:
@@ -98,6 +104,7 @@ def main():
     new = {'draws': draws}
     if new != old:
         LIVE.write_text(json.dumps(new, indent=1) + '\n')
+        stamp()
     added = [d['draw'] for d in draws if d['draw'] not in {x['draw'] for x in old['draws']}]
     print(f"provisional draws: {[d['draw'] for d in draws] or 'none'}; new: {added or 'none'}")
     if added and os.environ.get('GITHUB_OUTPUT'):

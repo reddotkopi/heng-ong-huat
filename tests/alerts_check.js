@@ -15,7 +15,7 @@ const server = http.createServer((req, res) => {
 // iPhone when the Safari platform is off in the OneSignal dashboard.
 const stub = (hang) => `window.__os = { optedIn: false, inits: [], calls: [], scripts: (window.__os ? window.__os.scripts : 0) + 1 };
 const OneSignal = { init: async (o) => { if (__os.inits.length) throw new Error('SDK already initialized'); __os.inits.push(o); ${hang ? 'await new Promise(() => {});' : ''} },
-  Notifications: { requestPermission: async () => { __os.calls.push('perm'); return true; }, setDefaultUrl: async (u) => { __os.defaultUrl = u; } },
+  Notifications: { requestPermission: async () => { __os.calls.push('perm'); OneSignal.User.PushSubscription.token = 'https://push.example/abc'; return true; }, setDefaultUrl: async (u) => { __os.defaultUrl = u; } },
   User: { PushSubscription: {
   optIn: async () => { __os.calls.push('in'); __os.optedIn = true; }, optOut: async () => { __os.calls.push('out'); __os.optedIn = false; } } } };
 const q = window.OneSignalDeferred || []; window.OneSignalDeferred = { push: (f) => f(OneSignal) }; q.forEach((f) => f(OneSignal));`;
@@ -49,11 +49,15 @@ server.listen(0, async () => {
     check(init.appId === '12345678-abcd-4ef0-9abc-1234567890ab' && init.serviceWorkerPath === 'heng-ong-huat/push/OneSignalSDKWorker.js' && init.serviceWorkerParam.scope === '/heng-ong-huat/push/' && init.autoResubscribe === true, `init options ${JSON.stringify(init)}`);
     check(/Alerts are on/.test(await p.textContent('#alertsState')) && (await p.textContent('#alertsBtn')) === 'Turn off alerts', 'shows on, with Turn off');
     await p.locator('#alertsCard').screenshot({ path: path.join(__dirname, 'shots', 'alerts-on.png') });
-    // reload: still on, SDK loads to keep the subscription in step
+    // reload within the week: still on, OneSignal not loaded again (each load reports a session)
     sdkLoads = 0; await p.reload(); await p.waitForTimeout(800);
-    check(sdkLoads === 1 && /Alerts are on/.test(await p.textContent('#alertsState')), 'after reload: still on, SDK reloaded');
+    check(sdkLoads === 0 && /Alerts are on/.test(await p.textContent('#alertsState')), 'after reload: still on, OneSignal not reloaded within the week');
+    // a week later: OneSignal is loaded once to renew the subscription
+    await p.evaluate(() => localStorage.setItem('hoh:alertsSync', String(Date.now() - 8 * 86400000)));
+    await p.reload(); await p.waitForTimeout(800);
+    check(sdkLoads === 1 && /Alerts are on/.test(await p.textContent('#alertsState')), 'a week later: OneSignal loaded once to keep the subscription fresh');
     await p.click('#alertsBtn'); await p.waitForTimeout(400);
-    check(await p.evaluate(() => window.__os.calls.join(',')) === 'out' && await p.evaluate(() => localStorage.getItem('hoh:alerts')) === 'false', 'turn off: unsubscribed and remembered');
+    check(await p.evaluate(() => window.__os.calls.join(',')) === 'out' && await p.evaluate(() => localStorage.getItem('hoh:alerts')) === 'false' && /Alerts are off/.test(await p.textContent('#alertsState')), 'turn off: unsubscribed and remembered');
     sdkLoads = 0; await p.reload(); await p.waitForTimeout(800);
     check(sdkLoads === 0, 'after turning off, OneSignal is not loaded again');
     check(!(await fetch(`http://localhost:${server.address().port}/heng-ong-huat/push/OneSignalSDKWorker.js`).then((r) => r.text())).indexOf('importScripts'), 'OneSignal worker file published under push/');
@@ -92,6 +96,21 @@ server.listen(0, async () => {
     await p.click('#alertsBtn'); await p.waitForTimeout(600);
     const st = await p.evaluate(() => ({ os: window.__os, stored: localStorage.getItem('hoh:alerts') }));
     check(st.os && st.os.inits.length === 1 && st.os.optedIn && st.stored === 'true', 'retry after a failed download: one init, alerts on');
+    check(errs.length === 0, 'no page errors ' + errs.join('|'));
+    await ctx.close();
+  }
+  // 6. turning off with OneSignal unreachable still turns alerts off on the phone
+  {
+    const ctx = await b.newContext({ ...devices['Pixel 7'] });
+    await ctx.addInitScript(() => { localStorage.setItem('hoh:alerts', 'true'); localStorage.setItem('hoh:alertsSync', String(Date.now())); localStorage.setItem('perm', 'granted'); });
+    await ctx.addInitScript(NOTIF('granted'));
+    await ctx.route('https://cdn.onesignal.com/**', (r) => r.abort());
+    await ctx.route('https://fonts.googleapis.com/**', (r) => r.fulfill({ contentType: 'text/css', body: '' }));
+    const p = await ctx.newPage(); const errs = []; p.on('pageerror', (e) => errs.push(e.message));
+    await p.goto(url); await p.waitForTimeout(800);
+    check((await p.textContent('#alertsBtn')) === 'Turn off alerts', 'starts on');
+    await p.click('#alertsBtn'); await p.waitForTimeout(1500);
+    check(/Alerts are off/.test(await p.textContent('#alertsState')) && await p.evaluate(() => localStorage.getItem('hoh:alerts')) === 'false', 'OneSignal unreachable: the phone-side unsubscribe still turns alerts off');
     check(errs.length === 0, 'no page errors ' + errs.join('|'));
     await ctx.close();
   }
