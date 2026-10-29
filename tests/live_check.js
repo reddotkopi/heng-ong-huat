@@ -158,6 +158,18 @@ server.listen(0, async () => {
     const s3 = await s1.textContent('#toast');
     check(/Draw 5555 results were corrected: your number 7307 came up, Consolation/.test(s3), `a later correction of a confirmed draw is told: "${s3}"`);
     await c5.close();
+    // a phone that first sees a draw already confirmed is also told a later correction
+    const c6 = await b.newContext({ ...devices['iPhone 13'] });
+    await c6.addInitScript((j) => { if (!localStorage.getItem('hoh:journal')) { localStorage.setItem('hoh:journal', j); localStorage.setItem('hoh:seenDraw', '5554'); } }, journal);
+    embedded = { ...original, updated: '2026-11-01T05:00:00Z', draws: [...original.draws, { ...prov, numbers: [...nums.slice(0, 22), '7308'], confirmed: true }] }; latest = embedded;
+    const u1 = await c6.newPage(); await u1.goto(url); await u1.waitForTimeout(800);
+    check(/Draw 5555 results are in/.test(await u1.textContent('#toast')), 'confirmed draw announced');
+    embedded = { ...original, updated: '2026-11-02T05:00:00Z', draws: [...original.draws, { ...prov, confirmed: true }] }; latest = embedded;
+    await u1.evaluate(() => { document.querySelector('#toast').textContent = ''; });
+    await u1.reload(); await u1.waitForTimeout(900);
+    const u2 = await u1.textContent('#toast');
+    check(/Draw 5555 results were corrected: your number 7307 came up, Consolation/.test(u2), `first seen confirmed, then corrected: told ("${u2}")`);
+    await c6.close();
     embedded = null; latest = original;
   }
   await b.close(); server.close();

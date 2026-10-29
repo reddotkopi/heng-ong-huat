@@ -936,6 +936,7 @@ td { font-size: 0.9375rem; }
   const pad4 = (v) => String(v).padStart(4, '0');
   let LAST = H.n - 1;
   const isProvisional = (di) => H.prov.has(di);
+  const BASE_N = H.n; // draws in the embedded archive (a fetch never replaces these on this page)
 
   function permutations(s) {
     const out = new Set();
@@ -2231,8 +2232,8 @@ td { font-size: 0.9375rem; }
     tell(news);
     store.set('seenDraw', Math.max(seen, H.n));
   }
-  // What this phone was shown of each provisional draw (and of it once confirmed, for its last ten
-  // draws), kept across visits, so a correction, a withdrawal or a draw coming back is told even if
+  // What this phone was shown of each of its last ten draws, provisional or confirmed, kept across
+  // visits, so a correction, a withdrawal or a draw coming back is told even if
   // it happened while the app was closed. A record is only compared with data at least as new as
   // the data it was shown from (pages served from an older cache are skipped) and, after a fetch,
   // only with draws the fetched list covers and joins up with (`reach`). A draw whose record has
@@ -2249,13 +2250,13 @@ td { font-size: 0.9375rem; }
         if (!rec.gone && !rec.confirmed && k >= reach && reach <= H.n + 1) { rec.gone = true; rec.stamp = liveStamp; out.push({ text: `Draw ${k} results were taken down while they are checked. Check Singapore Pools for the official results.`, prio: 2 }); }
         continue;
       }
-      if (k < reach) continue; // the fetched list says nothing about this draw; the page's copy may be older
+      if (k < reach || (reach && k <= BASE_N)) continue; // after a fetch, judge only draws the page took from the fetched list
       const d = drawRecord(k - 1);
       if (rec.gone) out.push(rec.numbers.join() === d.numbers.join() ? drawsNews([d], 2) : correctionNews(rec, d));
       else if (rec.numbers.join() !== d.numbers.join()) out.push(correctionNews(rec, d));
       shown[key] = { numbers: d.numbers, stamp: liveStamp, confirmed: d.confirmed };
     }
-    for (const di of H.prov) if (!shown[di + 1] && di + 1 > done) shown[di + 1] = { numbers: drawRecord(di).numbers, stamp: liveStamp };
+    for (let di = Math.max(0, H.n - 10); di < H.n; di++) if (!shown[di + 1] && di + 1 > done) shown[di + 1] = { numbers: drawRecord(di).numbers, stamp: liveStamp, confirmed: !isProvisional(di) };
     provMem = shown; store.set('provShown', shown);
     return out;
   }
@@ -2406,6 +2407,7 @@ td { font-size: 0.9375rem; }
         // OneSignal may still finish later (init subscribes once permission is granted, or a call
         // is still running): undo it then, as for a turn-off, unless the user tries again
         offAsked = true;
+        if (store.get('alerts', false)) store.set('alerts', false); // a flag left from before the permission was reset
         if (ready) {
           ready.then((OneSignal) => Promise.resolve(inflight).catch(() => {}).then(() => {
             if (!offAsked) return;
@@ -2423,7 +2425,6 @@ td { font-size: 0.9375rem; }
       let told = false, dropped = false;
       try {
         const OneSignal = await load();
-        await renewing; // a renewal already under way finishes first, so it cannot re-subscribe afterwards
         await within(OneSignal.User.PushSubscription.optOut(), 'Unsubscribing');
         told = true;
       } catch { /* offline or blocked: dropping the subscription below still stops alerts */ }
@@ -2458,7 +2459,15 @@ td { font-size: 0.9375rem; }
         const same = ps && ps.endpoint === store.get('alertsEndpoint', '');
         if (same && Date.now() - store.get('alertsSync', 0) <= 7 * DAY) return null;
         return load()
-          .then((OneSignal) => (same || offAsked ? null : (renewing = within(OneSignal.Notifications.requestPermission(), 'Subscribing').catch(() => null))))
+          .then((OneSignal) => {
+            if (same || offAsked) return null;
+            // one renewal at a time; if alerts are turned off while it runs, undo what it subscribed
+            renewing = renewing || OneSignal.Notifications.requestPermission().catch(() => null).finally(() => {
+              renewing = null;
+              if (offAsked) { OneSignal.User.PushSubscription.optOut().catch(() => {}); pushSub().then((ps) => ps && ps.unsubscribe()).catch(() => {}); }
+            });
+            return within(renewing, 'Subscribing').catch(() => null);
+          })
           .then(pushSub)
           .then((now) => { store.set('alertsSync', Date.now()); store.set('alertsEndpoint', now ? now.endpoint : ''); });
       }).catch(() => {});

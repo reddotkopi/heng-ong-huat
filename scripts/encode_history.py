@@ -28,7 +28,7 @@ def read_draws(path, corrections=True):
 def apply_corrections(draws, path):
     """data/corrections.json, if present, overrides the archive's 1st, 2nd and 3rd prizes and/or the
     date of a draw found to be wrong (checked against Singapore Pools), for example
-        {"5555": {"top": ["1234", "5678", "9012"], "date": "2026/10/31", "note": "1st and 2nd were swapped"}}
+        {"5555": {"top": ["1234", "5678", "9012"], "date": "2026/10/04", "note": "1st and 2nd were swapped"}}
     """
     if not path.exists():
         return
@@ -43,8 +43,7 @@ def apply_corrections(draws, path):
                     raise ValueError(f'draw {k}: "top" needs three four-digit numbers')
                 draws[n]['nums'][:3] = top
             if date is not None:
-                datetime.datetime.strptime(date, '%Y/%m/%d')
-                draws[n]['date'] = date
+                draws[n]['date'] = datetime.datetime.strptime(date, '%Y/%m/%d').strftime('%Y/%m/%d')  # always zero-padded
     except (ValueError, KeyError, TypeError, AttributeError) as e:
         raise SystemExit(f'::error::data/corrections.json is not valid ({e}); fix the edit')
 

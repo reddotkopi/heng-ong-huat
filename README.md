@@ -78,7 +78,7 @@ correction alert put right the provisional result, and the workflow run is marke
 repository owner is emailed. Check the draw on Singapore Pools' site. If the archive is wrong, add
 the right result to `data/corrections.json`, for example
 `{"5555": {"top": ["1234", "5678", "9012"], "note": "1st and 2nd were swapped"}}` (a `"date"`,
-written `"2026/10/31"`, can be corrected too). Every published result then uses it, and a
+written `"2026/10/04"`, can be corrected too). Every published result then uses it, and a
 correction alert goes out. If the fast feed corrects a provisional draw itself, the app shows the
 new result and a correction alert goes out.
 

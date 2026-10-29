@@ -87,13 +87,12 @@ def message(m):
 def key_for(m):
     """The same draw and result always gets the same key, so a re-run never sends it twice.
     A UUID with version-4 bits, which is what OneSignal asks for, derived from the content."""
-    # A 'new' alert also carries the data's update stamp: re-runs of the same update are not sent
-    # twice, but a later update that publishes the draw again (say, after it was missing) is.
+    # The key also carries the data's update stamp: re-runs of the same update are not sent twice,
+    # but every later update that changes the result again is (a correction undone and redone).
     name = f"heng-ong-huat/{m['kind']}/{m['draw']}/{''.join(m['top'])}" + ('/confirmed' if m['confirmed'] else '')
-    if m['kind'] == 'new':
-        name += '/' + m.get('stamp', '')
-    elif m['kind'] == 'correction':  # and what it replaces, so undoing a correction is sent too
+    if m['kind'] == 'correction':
         name += '/was/' + ''.join(m.get('was', [])) + ('/confirmed' if m.get('was_confirmed') else '')
+    name += '/' + m.get('stamp', '')
     return str(uuid.UUID(bytes=hashlib.sha256(name.encode()).digest()[:16], version=4))
 
 
@@ -167,6 +166,12 @@ def main():
         except Exception as e:
             print(f'::warning::could not read the live site ({e}); comparing with the repo instead')
             snap = published()
+            fixes = ROOT / 'data' / 'corrections.json'
+            if fixes.exists():  # the repo's site lists these too (latest.json 'corrected')
+                from encode_history import read_draws
+                cur = read_draws(ROOT / 'data' / 'sp_4d_prizes.csv')
+                for k in map(int, json.loads(fixes.read_text())):
+                    snap.setdefault(k, {'date': cur[k]['date'], 'top': cur[k]['nums'][:3], 'confirmed': True})
         pathlib.Path(args[1]).write_text(json.dumps(snap))
     elif args[:1] == ['--diff']:
         before = {int(k): v for k, v in json.loads(pathlib.Path(args[1]).read_text()).items()}
