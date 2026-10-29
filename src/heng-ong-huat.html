@@ -748,7 +748,7 @@ td { font-size: 0.9375rem; }
         <p class="small muted">A notification on this phone when each draw’s results are in, around 7pm on Wednesday, Saturday and Sunday.</p>
         <p class="small" id="alertsState" role="status"></p>
         <div class="draw-nav" id="alertsActions" hidden><button class="btn" type="button" id="alertsBtn"></button></div>
-        <p class="small muted">Alerts are sent through OneSignal, a notification service. When you turn them on or off, about once a week while they are on, and if this phone’s push address changes, OneSignal receives this phone’s push address, IP address, device and browser version, language and time zone, and for the rest of that visit, when the app is in use. It also learns whether alerts are opened. It gets nothing about your numbers or journal.</p>
+        <p class="small muted">Alerts are sent through OneSignal, a notification service. When you turn them on or off (and on your next visit after that), about once a week while they are on, and if this phone’s push address changes, OneSignal receives this phone’s push address, IP address, device and browser version, language and time zone, and for the rest of that visit, when the app is in use. It also learns whether alerts arrive and are opened, and when one arrives this phone may download OneSignal’s alert code from its servers. It gets nothing about your numbers or journal.</p>
       </div>
 
       <div class="card" id="datesCard">
@@ -936,7 +936,6 @@ td { font-size: 0.9375rem; }
   const pad4 = (v) => String(v).padStart(4, '0');
   let LAST = H.n - 1;
   const isProvisional = (di) => H.prov.has(di);
-  const BASE_N = H.n; // draws in the embedded archive (a fetch never replaces these on this page)
 
   function permutations(s) {
     const out = new Set();
@@ -2143,6 +2142,7 @@ td { font-size: 0.9375rem; }
    * from the archive, and provisional ones from the evening's fast feed. Draws newer than the
    * embedded archive are appended; a confirmed draw replaces a provisional one. */
   let liveDraws = [], liveStamp = '';
+  const baseFix = new Map(); // fetched confirmed copies of draws in the embedded archive (a correction since this page was built)
   const PUSH_APP_ID = '__ONESIGNAL_APP_ID__'; // the site's OneSignal app, filled in by the build; empty means no alerts
   try {
     const el = $('#live-data');
@@ -2159,12 +2159,29 @@ td { font-size: 0.9375rem; }
     const fetched = (draws || []).filter(validDraw), reach = Math.min(...fetched.map((d) => d.draw));
     const byNo = new Map(liveDraws.filter((d) => d.confirmed || d.draw < reach).map((d) => [d.draw, d]));
     for (const d of fetched) {
-      if (d.draw <= baseN) continue;
+      if (d.draw <= baseN) { if (d.confirmed) baseFix.set(d.draw, d); continue; }
       const had = byNo.get(d.draw);
       if (!had || !had.confirmed || d.confirmed) byNo.set(d.draw, d);
     }
+    // A fetched copy of an archive draw that differs (corrected since this page was built) takes the
+    // place of the embedded one, if its date still fits between its neighbours.
+    const dayOf = (d) => { const [y, m, dd] = d.date.split('/').map(Number); return Math.round((Date.UTC(y, m - 1, dd) - EPOCH) / DAY); };
+    let baseRaw = BASE_RAW, b = base;
+    if (baseFix.size) {
+      const parts = BASE_RAW.split(';'), days = Array.from(base.day);
+      let touched = false;
+      for (const k of [...baseFix.keys()].sort((x, y) => x - y)) {
+        const d = baseFix.get(k), i = k - 1, prev = i ? days[i - 1] : 0, day = dayOf(d), next = i + 1 < baseN ? days[i + 1] : Infinity;
+        if (day < prev || day > next) continue;
+        const part = `${day - prev},${d.numbers.join('')}`;
+        if (part === parts[i]) continue;
+        parts[i] = part; days[i] = day; touched = true;
+        if (i + 1 < baseN) parts[i + 1] = `${next - day}${parts[i + 1].slice(parts[i + 1].indexOf(','))}`;
+      }
+      if (touched) { baseRaw = parts.join(';'); b = buildHistory(baseRaw); }
+    }
     const extra = [];
-    let prevDay = base.day[baseN - 1];
+    let prevDay = b.day[baseN - 1];
     for (let n = baseN + 1; byNo.has(n); n++) {
       const d = byNo.get(n), [y, m, dd] = d.date.split('/').map(Number);
       const day = Math.round((Date.UTC(y, m - 1, dd) - EPOCH) / DAY);
@@ -2173,7 +2190,7 @@ td { font-size: 0.9375rem; }
     }
     const before = H.n;
     liveDraws = extra;
-    let raw = BASE_RAW, last = base.day[baseN - 1];
+    let raw = baseRaw, last = b.day[baseN - 1];
     for (const d of extra) {
       const [y, m, dd] = d.date.split('/').map(Number), day = Math.round((Date.UTC(y, m - 1, dd) - EPOCH) / DAY);
       raw += `;${day - last},${d.numbers.join('')}`; last = day;
@@ -2250,7 +2267,7 @@ td { font-size: 0.9375rem; }
         if (!rec.gone && !rec.confirmed && k >= reach && reach <= H.n + 1) { rec.gone = true; rec.stamp = liveStamp; out.push({ text: `Draw ${k} results were taken down while they are checked. Check Singapore Pools for the official results.`, prio: 2 }); }
         continue;
       }
-      if (k < reach || (reach && k <= BASE_N)) continue; // after a fetch, judge only draws the page took from the fetched list
+      if (k < reach) continue; // the fetched list says nothing about this draw; the page's copy may be older
       const d = drawRecord(k - 1);
       if (rec.gone) out.push(rec.numbers.join() === d.numbers.join() ? drawsNews([d], 2) : correctionNews(rec, d));
       else if (rec.numbers.join() !== d.numbers.join()) out.push(correctionNews(rec, d));
@@ -2401,7 +2418,8 @@ td { font-size: 0.9375rem; }
         // can still hold one from before alerts were last turned off)
         const ps = await pushSub();
         if (!ps) throw new Error('no push subscription');
-        store.set('alerts', true); store.set('alertsSync', Date.now()); store.set('alertsEndpoint', ps.endpoint);
+        // alertsSync 0: the next open checks in once more, so OneSignal sends any update still queued
+        store.set('alerts', true); store.set('alertsSync', 0); store.set('alertsEndpoint', ps.endpoint);
         busy = false; render('Alerts are on. You’ll get one when the next results are in.');
       } catch {
         // OneSignal may still finish later (init subscribes once permission is granted, or a call
@@ -2469,7 +2487,7 @@ td { font-size: 0.9375rem; }
             return within(renewing, 'Subscribing').catch(() => null);
           })
           .then(pushSub)
-          .then((now) => { store.set('alertsSync', Date.now()); store.set('alertsEndpoint', now ? now.endpoint : ''); });
+          .then((now) => { store.set('alertsSync', same ? Date.now() : 0); store.set('alertsEndpoint', now ? now.endpoint : ''); });
       }).catch(() => {});
     }
     return { start, render };

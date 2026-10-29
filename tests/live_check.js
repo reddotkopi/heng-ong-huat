@@ -170,6 +170,18 @@ server.listen(0, async () => {
     const u2 = await u1.textContent('#toast');
     check(/Draw 5555 results were corrected: your number 7307 came up, Consolation/.test(u2), `first seen confirmed, then corrected: told ("${u2}")`);
     await c6.close();
+    // an open page takes a correction to a confirmed archive draw from the fetched list and tells it
+    const c7 = await b.newContext({ ...devices['iPhone 13'] });
+    await c7.addInitScript(() => { if (!localStorage.getItem('hoh:journal')) { localStorage.setItem('hoh:journal', JSON.stringify([{ id: 1, number: '6205', deity: 'tpk', need: 1, at: Date.parse('2026-10-20T02:00:00Z'), log: [] }])); localStorage.setItem('hoh:seenDraw', '5554'); } });
+    embedded = null; latest = original;
+    const w1 = await c7.newPage(); await w1.goto(url); await w1.waitForTimeout(800);
+    const fixed = original.draws.map((d) => (d.draw === 5554 ? { ...d, numbers: [d.numbers[0], d.numbers[1], '6205', ...d.numbers.slice(3)] } : d));
+    latest = { ...original, updated: '2026-11-03T05:00:00Z', draws: fixed };
+    await w1.evaluate(() => { document.querySelector('#toast').textContent = ''; }); await w1.evaluate(() => window.__HOH.fetchLive()); await w1.waitForTimeout(400);
+    const w2 = await w1.textContent('#toast');
+    check(/Draw 5554 results were corrected: your number 6205 came up, 3rd Prize/.test(w2) && await w1.evaluate(() => window.__HOH.H.drawNumbers(5553)[2]) === 6205, `an open page takes and tells a correction to an archive draw ("${w2}")`);
+    check(await w1.evaluate(() => window.__HOH.H.n) === 5554, 'the history length is unchanged');
+    await c7.close();
     embedded = null; latest = original;
   }
   await b.close(); server.close();

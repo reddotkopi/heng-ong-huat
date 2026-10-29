@@ -59,9 +59,11 @@ server.listen(0, async () => {
     check(/Alerts are on/.test(await p.textContent('#alertsState')) && (await p.textContent('#alertsBtn')) === 'Turn off alerts', 'shows on, with Turn off');
     check(await p.evaluate(() => localStorage.getItem('hoh:alertsEndpoint')) === '"https://push.example/abc"', 'the push address OneSignal has is remembered');
     await p.locator('#alertsCard').screenshot({ path: path.join(__dirname, 'shots', 'alerts-on.png') });
-    // reload within the week: still on, OneSignal not loaded again (each load reports a session)
+    // the next open checks in once more (OneSignal sends anything still queued), then not within the week
     sdkLoads = 0; await p.reload(); await p.waitForTimeout(800);
-    check(sdkLoads === 0 && /Alerts are on/.test(await p.textContent('#alertsState')), 'after reload: still on, OneSignal not reloaded within the week');
+    check(sdkLoads === 1 && /Alerts are on/.test(await p.textContent('#alertsState')), 'the next open after turning on checks in with OneSignal once');
+    sdkLoads = 0; await p.reload(); await p.waitForTimeout(800);
+    check(sdkLoads === 0 && /Alerts are on/.test(await p.textContent('#alertsState')), 'after that: still on, OneSignal not reloaded within the week');
     // a week later: OneSignal is loaded once to renew the subscription
     await p.evaluate(() => localStorage.setItem('hoh:alertsSync', String(Date.now() - 8 * 86400000)));
     await p.reload(); await p.waitForTimeout(800);
