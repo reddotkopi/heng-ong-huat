@@ -15,8 +15,8 @@ self.addEventListener('activate', (e) => {
 });
 
 // Pages: try the network first (fresh draw results), fall back to the cached copy after
-// 4 seconds or when offline. Fonts: serve from cache, refresh in the background.
-// Everything else from this site: cache first.
+// 4 seconds or when offline. latest.json (same-evening results): network first.
+// Fonts: serve from cache, refresh in the background. Everything else from this site: cache first.
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
@@ -42,6 +42,11 @@ self.addEventListener('fetch', (e) => {
       const refresh = fetch(req).then((res) => { if (res.ok || res.type === 'opaque') cache.put(req, res.clone()); return res; }).catch(() => hit);
       return hit || refresh;
     })());
+    return;
+  }
+  if (url.origin === self.location.origin && url.pathname.endsWith('/latest.json')) {
+    e.respondWith(fetch(req).then((res) => { if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put('./latest.json', copy)); } return res; })
+      .catch(() => caches.match('./latest.json').then((hit) => hit || Response.error())));
     return;
   }
   if (url.origin === self.location.origin) {

@@ -738,6 +738,14 @@ td { font-size: 0.9375rem; }
         <div id="drawBody"></div>
       </div>
 
+      <div class="card" id="alertsCard" hidden>
+        <h2 class="section-title"><span class="brush" lang="zh-Hans">报</span>Result alerts</h2>
+        <p class="small muted">A notification on this phone when each draw’s results are in, around 7pm on Wednesday, Saturday and Sunday.</p>
+        <p class="small" id="alertsState" role="status"></p>
+        <div class="draw-nav" id="alertsActions" hidden><button class="btn" type="button" id="alertsBtn"></button></div>
+        <p class="small muted">Alerts are sent through OneSignal, a notification service. It gets an anonymous ID for this phone, nothing about your numbers or journal.</p>
+      </div>
+
       <div class="card" id="datesCard">
         <h2 class="section-title"><span class="brush" lang="zh-Hans">念</span>Dates that matter</h2>
         <p class="small muted">An ancestor’s birthday or death anniversary, a wedding, a child’s birth. See the 1st prizes drawn on that date over the years.</p>
@@ -836,6 +844,7 @@ td { font-size: 0.9375rem; }
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script id="hist-data" type="text/plain">__HISTORY_DATA__</script>
+<script id="live-data" type="application/json">__LIVE_DATA__</script>
 <script>
 'use strict';
 (() => {
@@ -877,8 +886,10 @@ td { font-size: 0.9375rem; }
   /* ---------------- Singapore Pools 4D history ---------------- */
   const TIER = { 1: '1st Prize', 2: '2nd Prize', 3: '3rd Prize', S: 'Starter', C: 'Consolation', X: 'Starter / Consolation' };
   const TIER_SHORT = { 1: '1st', 2: '2nd', 3: '3rd', S: 'Starter', C: 'Consol.', X: 'S / C' };
-  const H = (() => {
-    const raw = $('#hist-data').textContent.trim();
+  // The archive is embedded; draws published since (same-evening results, marked provisional
+  // until the archive confirms them) are appended by applyLive().
+  const BASE_RAW = $('#hist-data').textContent.trim();
+  function buildHistory(raw) {
     const parts = raw.split(';');
     const n = parts.length;
     let total = 0;
@@ -914,9 +925,12 @@ td { font-size: 0.9375rem; }
         return ans;
       },
     };
-  })();
+  }
+  let H = buildHistory(BASE_RAW);
+  H.confirmed = H.n; H.raw = BASE_RAW;
   const pad4 = (v) => String(v).padStart(4, '0');
-  const LAST = H.n - 1;
+  let LAST = H.n - 1;
+  const isProvisional = (di) => di >= H.confirmed;
 
   function permutations(s) {
     const out = new Set();
@@ -1911,12 +1925,14 @@ td { font-size: 0.9375rem; }
 
   /* ---------------- History view ---------------- */
   // Honest baselines: every number is compared with what chance alone gives.
-  const BASE = (() => {
+  let BASE;
+  const computeBase = () => (BASE = (() => {
     let min = Infinity, max = 0;
     for (let v = 0; v < 10000; v++) { const c = H.count(v); if (c < min) min = c; if (c > max) max = c; }
     const sd = Math.sqrt(H.expected);
     return { min, max, lo: Math.max(0, Math.round(H.expected - 2 * sd)), hi: Math.round(H.expected + 2 * sd) };
-  })();
+  })());
+  computeBase();
   const pAnyPrize = (k) => 1 - Math.pow(1 - k / 10000, 23); // chance a family of k numbers shows up in one draw
   const pct = (p) => (p * 100 < 1 ? (p * 100).toFixed(2) : (p * 100).toFixed(1)) + '%';
   const tierPill = (i) => `<span class="tier-pill tp-${H.tier(i)}">${TIER[H.tier(i)]}</span>`;
@@ -1947,7 +1963,7 @@ td { font-size: 0.9375rem; }
         ${c.X ? `<p class="small muted">Plus ${c.X} ${c.X === 1 ? 'win' : 'wins'} from early draws (before April 1991) with an unusual number of prizes, whose records do not separate Starter from Consolation.</p>` : ''}
         ${n ? `<p class="small">First: ${tierPill(first)} ${whenOf(first)}<br>Last: ${tierPill(last)} ${whenOf(last)}${since ? `, ${since.toLocaleString('en-SG')} draws ago` : ', the latest draw'}</p>` : ''}
         ${full ? stripChart(st.occ) : ''}
-        <p class="small"><strong>Latest draw</strong> (Draw ${H.n}, ${fmtDay(H.day[LAST])}): ${exactNow.length ? `${str} won ${exactNow.map(tierAt).join(' and ')}` : `${str} was not drawn`}${famNow.length ? `; its arrangement ${famNow.map((o) => `${o.x} (${tierAt(o.k)})`).join(', ')} was` : ''}.</p>
+        <p class="small"><strong>Latest draw</strong> (Draw ${H.n}, ${fmtDay(H.day[LAST])}${isProvisional(LAST) ? ', provisional' : ''}): ${exactNow.length ? `${str} won ${exactNow.map(tierAt).join(' and ')}` : `${str} was not drawn`}${famNow.length ? `; its arrangement ${famNow.map((o) => `${o.x} (${tierAt(o.k)})`).join(', ')} was` : ''}.</p>
         ${famSize > 1 ? `<p class="small muted">Its ${famSize} arrangements (the numbers an iBet covers) have won ${st.permTotal} times in all; chance alone gives about ${Math.round(famSize * H.expected)}. A family this size turns up in about ${pct(pAnyPrize(famSize))} of draws.</p>` : `<p class="small muted">All four digits are the same, so it has only one arrangement.</p>`}
         ${full ? `<div class="perm-list">${st.perms.map((p) => `<button type="button" class="perm ${p.p === str ? 'self' : ''}" data-num="${p.p}">${p.p}<small>${p.c}×</small></button>`).join('')}</div>` : ''}
         ${full && n ? `<div class="table-wrap"><table><thead><tr><th>Draw</th><th>Date</th><th>Prize</th></tr></thead><tbody>${st.occ.map((i) => `<tr><td class="num">${H.drawOf[i] + 1}</td><td>${whenOf(i)}</td><td>${tierPill(i)}</td></tr>`).join('')}</tbody></table></div>` : ''}
@@ -2001,7 +2017,8 @@ td { font-size: 0.9375rem; }
     $('#nextDrawBtn').disabled = shownDraw === LAST;
     const btn = (n) => `<button type="button" class="${n === mark ? 'mark' : ''}" data-num="${n}">${n}</button>`;
     $('#drawBody').innerHTML = `
-      <p><span class="num" style="font-size:1.25rem;color:var(--text)">Draw ${shownDraw + 1}</span> <span class="muted">· ${fmtDay(H.day[shownDraw])}${shownDraw === LAST ? ' · latest in this app' : ''}</span></p>
+      <p><span class="num" style="font-size:1.25rem;color:var(--text)">Draw ${shownDraw + 1}</span> <span class="muted">· ${fmtDay(H.day[shownDraw])}${shownDraw === LAST ? ' · latest in this app' : ''}</span>${isProvisional(shownDraw) ? ' <span class="tier-pill tp-S">Provisional</span>' : ''}</p>
+      ${isProvisional(shownDraw) ? '<p class="small muted">Published the same evening from a fast results feed. It is checked against the full archive the next day, and the archive’s result replaces it if they differ.</p>' : ''}
       <div class="top3">
         ${['1st', '2nd', '3rd'].map((t, k) => `<button type="button" class="${nums[k] === mark ? 'mark' : ''}" data-num="${nums[k]}"><small>${t} prize</small><span class="num">${nums[k]}</span></button>`).join('')}
       </div>
@@ -2074,8 +2091,9 @@ td { font-size: 0.9375rem; }
   }
   $('#newsList').addEventListener('click', (e) => { const b = e.target.closest('[data-num]'); if (b) jumpTo(b.dataset.num); });
 
-  const heatCache = {};
+  let heatCache = {}, heatFilter = 'all';
   function renderHeat(f) {
+    heatFilter = f;
     $$('#heatFilter button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.f === f)));
     let data = heatCache[f];
     if (!data) {
@@ -2108,6 +2126,177 @@ td { font-size: 0.9375rem; }
   }
   $('#heatFilter').addEventListener('click', (e) => { const b = e.target.closest('button[data-f]'); if (b) renderHeat(b.dataset.f); });
 
+  /* ---------------- Same-evening results ----------------
+   * latest.json (published by the site's update job) carries the newest draws: the last few
+   * from the archive, and provisional ones from the evening's fast feed. Draws newer than the
+   * embedded archive are appended; a confirmed draw replaces a provisional one. */
+  let liveDraws = [];
+  const PUSH_APP_ID = '__ONESIGNAL_APP_ID__'; // the site's OneSignal app, filled in by the build; empty means no alerts
+  try { const el = $('#live-data'); if (el && el.textContent.trim().startsWith('{')) liveDraws = JSON.parse(el.textContent).draws || []; } catch { liveDraws = []; }
+  function applyLive(draws, announceNew) {
+    const base = buildHistory(BASE_RAW), baseN = base.n;
+    const byNo = new Map(liveDraws.map((d) => [d.draw, d]));
+    for (const d of draws || []) {
+      if (!d || !Number.isInteger(d.draw) || d.draw <= baseN || !/^\d{4}\/\d{2}\/\d{2}$/.test(d.date) || !Array.isArray(d.numbers) || d.numbers.length !== 23 || !d.numbers.every((x) => /^\d{4}$/.test(x))) continue;
+      const had = byNo.get(d.draw);
+      if (!had || !had.confirmed || d.confirmed) byNo.set(d.draw, d);
+    }
+    const extra = [];
+    let prevDay = base.day[baseN - 1];
+    for (let n = baseN + 1; byNo.has(n); n++) {
+      const d = byNo.get(n), [y, m, dd] = d.date.split('/').map(Number);
+      const day = Math.round((Date.UTC(y, m - 1, dd) - EPOCH) / DAY);
+      if (day < prevDay) break;
+      extra.push(d); prevDay = day;
+    }
+    const before = H.n;
+    liveDraws = extra;
+    let raw = BASE_RAW, last = base.day[baseN - 1];
+    for (const d of extra) {
+      const [y, m, dd] = d.date.split('/').map(Number), day = Math.round((Date.UTC(y, m - 1, dd) - EPOCH) / DAY);
+      raw += `;${day - last},${d.numbers.join('')}`; last = day;
+    }
+    const nextH = buildHistory(raw);
+    let confirmed = baseN;
+    for (const d of extra) { if (d.confirmed) confirmed++; else break; }
+    nextH.confirmed = confirmed;
+    const changed = nextH.n !== H.n || nextH.confirmed !== H.confirmed || raw !== H.raw;
+    nextH.raw = raw;
+    if (!changed) return [];
+    const wasLatest = shownDraw === LAST;
+    H = nextH; LAST = H.n - 1; heatCache = {}; computeBase();
+    renderNextDraw(); renderAbout(); renderHeat(heatFilter); renderJournal(); renderDates();
+    renderDraw(wasLatest ? LAST : shownDraw);
+    const cur = $('#lookupInput').value; if (/^\d{4}$/.test(cur)) lookup(cur);
+    const added = extra.filter((d) => d.draw > before);
+    if (announceNew && added.length) announceDraws(added);
+    return added;
+  }
+  // Tells the user about new results, and whether any number in their journal came up.
+  function announceDraws(added) {
+    const d = added[added.length - 1];
+    const hits = [];
+    for (const e of journal()) {
+      for (const a of added) {
+        const [y, m, dd] = a.date.split('/').map(Number);
+        if (e.at >= Date.UTC(y, m - 1, dd, 10, 30)) continue; // received after this draw (6.30pm Singapore time)
+        a.numbers.forEach((x, k) => { if (x === e.number) hits.push(`Your number ${e.number} came up: ${TIER[k < 3 ? k + 1 : k < 13 ? 'S' : 'C']} in Draw ${a.draw}${a.confirmed ? '' : ' (provisional)'}.`); });
+      }
+    }
+    const msg = hits.length ? hits[0] : `Draw ${d.draw} results are in: 1st ${d.numbers[0]}, 2nd ${d.numbers[1]}, 3rd ${d.numbers[2]}.`;
+    toast(msg); announce(msg);
+  }
+  let liveFetchedAt = 0;
+  async function fetchLive() {
+    if (inFrame || !/^https?:$/.test(location.protocol)) return;
+    liveFetchedAt = Date.now();
+    try {
+      const res = await fetch(`latest.json?t=${Date.now()}`, { cache: 'no-store' });
+      if (res.ok) applyLive((await res.json()).draws, true);
+    } catch { /* offline: keep what we have */ }
+  }
+  // Draw evenings are Wed, Sat and Sun from 6.30pm Singapore time: check every 2 minutes then.
+  const drawEvening = () => { const t = sgNowParts(), wd = t.getUTCDay(), m = t.getUTCHours() * 60 + t.getUTCMinutes(); return (wd === 3 || wd === 6 || wd === 0) && m >= 18 * 60 + 30 && m <= 21 * 60 + 30; };
+  setInterval(() => { if (!document.hidden && drawEvening()) fetchLive(); }, 120000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - liveFetchedAt > (drawEvening() ? 60000 : 600000)) fetchLive(); });
+
+  /* ---------------- Result alerts (web push through OneSignal) ----------------
+   * Only on the website, once the site has a OneSignal app (the build fills in its ID).
+   * OneSignal's code loads only after the user turns alerts on, and runs in its own
+   * service worker under push/, apart from the app's offline cache. The notification
+   * permission is asked for straight from the tap, as iPhone requires. */
+  const Alerts = (() => {
+    const appId = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(PUSH_APP_ID) ? PUSH_APP_ID : '';
+    const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const standalone = () => navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+    const supported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    const card = $('#alertsCard'), state = $('#alertsState'), btn = $('#alertsBtn'), actions = $('#alertsActions');
+    let sdk = null, busy = false;
+    const isOn = () => supported() && store.get('alerts', false) && Notification.permission === 'granted';
+    function load() {
+      if (sdk) return sdk;
+      sdk = new Promise((resolve, reject) => {
+        const base = location.pathname.replace(/[^/]*$/, '');
+        window.OneSignalDeferred = window.OneSignalDeferred || [];
+        window.OneSignalDeferred.push(async (OneSignal) => {
+          try {
+            await OneSignal.init({
+              appId,
+              serviceWorkerPath: base.slice(1) + 'push/OneSignalSDKWorker.js',
+              serviceWorkerParam: { scope: base + 'push/' },
+              notifyButton: { enable: false },
+              welcomeNotification: { disable: true },
+              promptOptions: { slidedown: { prompts: [] } },
+            });
+            resolve(OneSignal);
+          } catch (e) { reject(e); }
+        });
+        const s = document.createElement('script');
+        s.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';
+        s.defer = true;
+        s.onerror = () => reject(new Error('could not load OneSignal'));
+        document.head.appendChild(s);
+        setTimeout(() => reject(new Error('OneSignal took too long')), 20000);
+      });
+      sdk.catch(() => { sdk = null; });
+      return sdk;
+    }
+    function render(note) {
+      const on = isOn();
+      actions.hidden = false; btn.disabled = busy;
+      if (!supported()) {
+        actions.hidden = true;
+        state.textContent = ios && !standalone()
+          ? 'On iPhone, alerts work in the home-screen app. In Safari tap Share, then Add to Home Screen, open Heng Ong Huat from your home screen and turn alerts on there.'
+          : 'This browser cannot show alerts from websites.';
+      } else if (Notification.permission === 'denied') {
+        actions.hidden = true;
+        state.textContent = ios ? 'Notifications are off for Heng Ong Huat. To get alerts, allow them in Settings › Notifications › Heng Ong Huat.' : 'Notifications are blocked for this site. Allow them in your browser’s site settings to get alerts.';
+      } else {
+        state.textContent = note || (on ? 'Alerts are on for this phone.' : 'Alerts are off.');
+        btn.textContent = on ? 'Turn off alerts' : 'Turn on alerts';
+        btn.className = on ? 'btn' : 'btn btn-primary';
+      }
+    }
+    async function turnOn() {
+      // ask first, inside the tap, before anything slow happens
+      const asked = Notification.permission === 'granted' ? Promise.resolve('granted') : Notification.requestPermission();
+      busy = true; render('Turning alerts on…');
+      try {
+        if ((await asked) !== 'granted') { busy = false; render(); return; }
+        const OneSignal = await load();
+        await OneSignal.User.PushSubscription.optIn();
+        store.set('alerts', true);
+        busy = false; render('Alerts are on. You’ll get one when the next results are in.');
+      } catch {
+        busy = false; render('Could not turn alerts on just now. Check your connection and try again.');
+      }
+    }
+    async function turnOff() {
+      busy = true; render('Turning alerts off…');
+      try {
+        const OneSignal = await load();
+        await OneSignal.User.PushSubscription.optOut();
+        store.set('alerts', false);
+        busy = false; render('Alerts are off.');
+      } catch {
+        busy = false; render('Could not reach the alert service. Try again when you are online.');
+      }
+    }
+    function start() {
+      if (!appId || inFrame || !(location.protocol === 'https:' || location.hostname === 'localhost')) return;
+      card.hidden = false;
+      btn.addEventListener('click', () => {
+        if (busy) return;
+        if (isOn()) turnOff(); else if (supported()) turnOn();
+      });
+      render();
+      // keep an existing subscription in step (OneSignal resubscribes if the browser dropped it)
+      if (isOn()) load().catch(() => {});
+    }
+    return { start, render };
+  })();
+
   /* ---------------- Next draw ---------------- */
   function renderNextDraw() {
     const nowSg = sgNowParts();
@@ -2119,7 +2308,7 @@ td { font-size: 0.9375rem; }
     }
     const t = out[0];
     const label = t ? `${WD[t.getUTCDay()]} ${t.getUTCDate()} ${MON[t.getUTCMonth()]}, 6.30pm` : '';
-    $('#nextDraw').innerHTML = `<span>Next 4D draw <b>${label}</b></span><span>Results here up to <b>${fmtDay(H.day[LAST], false)}</b></span>`;
+    $('#nextDraw').innerHTML = `<span>Next 4D draw <b>${label}</b></span><span>Results here up to <b>${fmtDay(H.day[LAST], false)}</b>${isProvisional(LAST) ? ' (provisional)' : ''}</span>`;
   }
 
   /* ---------------- About: block figures ---------------- */
@@ -2128,7 +2317,7 @@ td { font-size: 0.9375rem; }
       <span class="brush" lang="zh-Hans" style="color:var(--${kind === 'sheng' ? 'yes' : kind === 'xiao' ? 'laugh' : 'no'})">${OUTCOME[kind].cn}</span><figcaption>${OUTCOME[kind].en}</figcaption></figure>`;
     $('#outcomeFigures').innerHTML = [fig('flat', 'flat', 'xiao'), fig('round', 'flat', 'sheng'), fig('round', 'round', 'yin')].join('');
     $('#outcomeNotes').innerHTML = Object.values(OUTCOME).map((o) => `<li><strong lang="zh-Hans" class="brush" style="font-size:1.15em">${o.cn}</strong> <strong>${o.name}</strong>: ${o.say}</li>`).join('');
-    $('#dataNote').innerHTML = `Every Singapore Pools 4D draw from Draw 1 on ${fmtDay(0)} to Draw ${H.n} on ${fmtDay(H.day[LAST])}: ${H.total.toLocaleString('en-SG')} winning numbers, from a public archive of Singapore Pools results. Results after that date are not in this version. Until 6 April 1991 the 4D result was tied to horse races, so the number of prizes varied: 210 of the 506 draws before then have 17 to 27 winning numbers instead of 23, and their records do not separate Starter from Consolation. Since then every draw has 23: 1st, 2nd, 3rd, 10 Starter and 10 Consolation. Always confirm results with Singapore Pools.`;
+    $('#dataNote').innerHTML = `Every Singapore Pools 4D draw from Draw 1 on ${fmtDay(0)} to Draw ${H.n} on ${fmtDay(H.day[LAST])}: ${H.total.toLocaleString('en-SG')} winning numbers, from a public archive of Singapore Pools results. When the app is installed from its website, new results appear the same evening, marked provisional until the archive confirms them the next day. Until 6 April 1991 the 4D result was tied to horse races, so the number of prizes varied: 210 of the 506 draws before then have 17 to 27 winning numbers instead of 23, and their records do not separate Starter from Consolation. Since then every draw has 23: 1st, 2nd, 3rd, 10 Starter and 10 Consolation. Always confirm results with Singapore Pools.`;
     $('#historyLede').textContent = `Singapore Pools 4D, Draw 1 (${fmtDay(0, false)}) to Draw ${H.n} (${fmtDay(H.day[LAST], false)}). Every number shown is a past result. Each draw is independent.`;
   }
 
@@ -2199,13 +2388,14 @@ td { font-size: 0.9375rem; }
 
   updateTablet(); syncSound(); renderNextDraw(); renderAbout(); setState('intro');
   renderDraw(LAST); renderHeat('all'); renderJournal(); renderNews();
+  applyLive(liveDraws, false); fetchLive(); Alerts.start();
   $('#memDate').value = isoDay(Math.floor((Date.now() + 8 * 3600000 - EPOCH) / DAY)); renderDates();
   lookup(pad4(H.num[H.start[LAST]]));
   if (/[?&]debug=1/.test(location.search)) debugOverlay();
   showView(location.hash.slice(1) || 'seek');
   placeBlocksAtRest();
   smoke();
-  window.__HOH = { H, R, numberStats, permutations, rand, Motion }; // for testing
+  window.__HOH = { get H() { return H; }, R, numberStats, permutations, rand, Motion, applyLive }; // for testing
 
   // ?debug=1 shows live sensor values, for tuning the bow and toss thresholds on a phone.
   function debugOverlay() {

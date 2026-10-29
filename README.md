@@ -39,8 +39,22 @@ The 1st, 2nd and 3rd prizes are cross-checked against a second, independent feed
 results have not been confirmed; check them before promoting the app.
 
 4D draws are on Wednesday, Saturday and Sunday at 6.30pm Singapore time. The GitHub Action
-`Update draw results and deploy` runs at 1.20pm and 7.20pm Singapore time on Thursday, Sunday and
-Monday. `scripts/update_data.py` accepts a new file only if:
+`Update draw results and deploy` checks for results:
+
+- **On draw evenings**, every 10 minutes from 6.45pm to 8.55pm Singapore time, for same-evening
+  results from the faster second feed. These are published as **provisional** and marked so in the app.
+- **The day after**, at 1.20pm and 7.20pm on Thursday, Sunday and Monday, for the confirmed archive.
+  A confirmed draw replaces the provisional one. If any of its top three prizes differ, the app uses
+  the confirmed result and a correction alert goes out.
+
+A scheduled run only redeploys the site when the results changed. GitHub can start scheduled runs a
+few minutes late, and it pauses schedules in a public repository after 60 days without activity (the
+result commits count as activity).
+
+The app fetches `latest.json` when it opens and every 2 minutes during draw evenings, so new results
+appear without reinstalling. It tells you if a number in your journal came up.
+
+`scripts/update_data.py` accepts a new archive file only if:
 
 - every number is four digits, the draw numbers run without gaps, and the dates never go backwards
 - every draw since 6 April 1991 has 23 numbers
@@ -50,6 +64,39 @@ Monday. `scripts/update_data.py` accepts a new file only if:
 Otherwise it keeps the stored results and logs a warning. Draws before 6 April 1991 were tied to horse
 races, so 210 of them have 17 to 27 winning numbers, and their records do not separate Starter from
 Consolation.
+
+`scripts/update_live.py` takes a same-evening draw only if it follows on from the archive with no gap,
+is not dated in the future, has 23 four-digit numbers, and lists its Starter and Consolation prizes
+in order (the feed sorts them, so a number out of order means it was misread).
+
+## Result alerts (optional)
+
+The app can send a phone notification when each draw's results are in, through
+[OneSignal](https://onesignal.com) (free for web push). Until it is set up, the alerts card stays
+hidden and the Action sends nothing.
+
+1. Sign up at onesignal.com and create an app. Choose **Web** as the platform and **Custom Code** as
+   the integration.
+2. Set **Site Name** to `Heng Ong Huat` and **Site URL** to `https://reddotkopi.github.io`. Add the icon
+   `https://reddotkopi.github.io/heng-ong-huat/icons/icon-192.png`. Leave the prompts off: the app
+   asks for permission itself, only when someone taps **Turn on alerts**.
+3. Copy the **App ID**. In this repository open **Settings → Secrets and variables → Actions →
+   Variables**, and add a variable named `ONESIGNAL_APP_ID` with the App ID. It is not secret: it
+   ends up in the page.
+4. In OneSignal open **Settings → Keys & IDs** and create an **API key**. In GitHub, on the **Secrets**
+   tab of the same page, add a secret named `ONESIGNAL_REST_API_KEY` with the key. Never put this
+   key anywhere else.
+5. Run the workflow from the **Actions** tab, so the app is rebuilt with alerts.
+
+How it behaves:
+
+- Alerts are opt-in, from the **Result alerts** card on the History tab. OneSignal's code is loaded only
+  after someone turns alerts on. It runs in its own service worker under `push/`, apart from the
+  app's offline cache. OneSignal gets an anonymous ID for the phone, and nothing from the journal.
+- On iPhone and iPad, alerts need iOS 16.4 or later and the app added to the home screen. In a
+  Safari tab the card explains this.
+- One alert per new draw: `4D Draw 5555 results (provisional)` with the top three prizes. If the
+  confirmed results differ, a correction follows. Re-running a job does not send an alert twice.
 
 ## Publish with GitHub Pages
 
@@ -64,7 +111,8 @@ The site is then at `https://reddotkopi.github.io/heng-ong-huat/`.
 ```sh
 python3 scripts/build.py            # site/ (the app) and dist/artifact.html (Claude artifact body)
 python3 -m http.server -d site 8000 # preview at http://localhost:8000
-python3 scripts/update_data.py      # fetch new results now
+python3 scripts/update_data.py      # fetch new archive results now
+python3 scripts/update_live.py      # fetch same-evening (provisional) results now
 ```
 
 Tests use Playwright with Chromium (`npm i playwright`, then `npx playwright install chromium`):
@@ -72,13 +120,16 @@ Tests use Playwright with Chromium (`npm i playwright`, then `npx playwright ins
 ```sh
 node tests/run.js site/index.html tests/shots   # ritual, history accuracy, layout, motion
 node tests/pwa.js                               # installable, offline, service worker
+node tests/live_check.js                        # same-evening results appear and get confirmed
+ONESIGNAL_APP_ID=12345678-abcd-4ef0-9abc-1234567890ab python3 scripts/build.py && node tests/alerts_check.js
 ```
 
 | Path | What it is |
 |---|---|
-| `src/heng-ong-huat.html` | The whole app: markup, styles and script. `__HISTORY_DATA__` is replaced at build time. |
+| `src/heng-ong-huat.html` | The whole app: markup, styles and script. `__HISTORY_DATA__`, `__LIVE_DATA__` and `__ONESIGNAL_APP_ID__` are filled in at build time. |
 | `data/sp_4d_prizes.csv` | Every winning number: `draw_number,number,date`, in prize order. |
-| `scripts/` | Build, data encoding and the data updater. |
+| `data/live.json` | Same-evening draws not yet in the archive (provisional). |
+| `scripts/` | Build, data encoding, the two result updaters and `notify.py` (result alerts). |
 | `pwa/sw.js` | Offline cache. |
 | `assets/icons/` | App icons. |
 

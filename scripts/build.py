@@ -5,11 +5,13 @@
   dist/artifact.html   the page body for the claude.ai artifact viewer (no document skeleton,
                        no service worker, since that viewer adds its own skeleton)
 """
-import hashlib, json, pathlib, shutil, sys
+import hashlib, json, os, pathlib, re, shutil, sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'scripts'))
-from encode_history import encode  # noqa: E402
+from encode_history import encode, read_draws  # noqa: E402
+
+RECENT = 6  # archive draws repeated in latest.json, so an old cached page can catch up
 
 DESCRIPTION = ('Ask your ancestors or a deity for a 4D number: write and fold ten slips, pray, throw the '
                'moon blocks, then see the number in every Singapore Pools draw since 1986.')
@@ -20,11 +22,34 @@ def main():
     data, meta = encode(ROOT / 'data' / 'sp_4d_prizes.csv')
     if src.count('__HISTORY_DATA__') != 1:
         raise SystemExit('src must contain __HISTORY_DATA__ exactly once')
-    body = src.replace('__HISTORY_DATA__', data)
+    archive = read_draws(ROOT / 'data' / 'sp_4d_prizes.csv')
+    live_path = ROOT / 'data' / 'live.json'
+    provisional = json.loads(live_path.read_text())['draws'] if live_path.exists() else []
+    last = max(archive)
+    latest = {
+        'last_confirmed': last,
+        'draws': [{'draw': k, 'date': archive[k]['date'], 'numbers': archive[k]['nums'], 'confirmed': True}
+                  for k in range(max(1, last - RECENT + 1), last + 1)]
+                 + [dict(d, confirmed=False) for d in provisional if d['draw'] > last],
+    }
+    latest_json = json.dumps(latest, separators=(',', ':'))
+    if src.count('__LIVE_DATA__') != 1:
+        raise SystemExit('src must contain __LIVE_DATA__ exactly once')
+    # Result alerts: the OneSignal app ID is public (it is in every page that uses it). Set it as
+    # the repository variable ONESIGNAL_APP_ID; without it the app has no alerts.
+    push_app = os.environ.get('ONESIGNAL_APP_ID', '').strip()
+    if push_app and not re.fullmatch(r'[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}', push_app, re.I):
+        print(f'::warning::ONESIGNAL_APP_ID {push_app!r} is not an app ID; building without result alerts')
+        push_app = ''
+    if src.count('__ONESIGNAL_APP_ID__') != 1:
+        raise SystemExit('src must contain __ONESIGNAL_APP_ID__ exactly once')
+    body = src.replace('__HISTORY_DATA__', data).replace('__LIVE_DATA__', latest_json)
+    artifact = body.replace('__ONESIGNAL_APP_ID__', '')
+    body = body.replace('__ONESIGNAL_APP_ID__', push_app)
 
     dist = ROOT / 'dist'
     dist.mkdir(exist_ok=True)
-    (dist / 'artifact.html').write_text(body)
+    (dist / 'artifact.html').write_text(artifact)
 
     site = ROOT / 'site'
     if site.exists():
@@ -82,7 +107,11 @@ if ('serviceWorker' in navigator && window.self === window.top && (location.prot
     }
     (site / 'manifest.webmanifest').write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n')
     (site / '.nojekyll').write_text('')
-    print(f"built site/ (draws 1-{meta['draws']}, latest {meta['last_date']}, cache {version}) and dist/artifact.html")
+    (site / 'latest.json').write_text(latest_json + '\n')
+    if push_app:  # OneSignal's service worker, kept in its own scope apart from sw.js
+        (site / 'push').mkdir()
+        (site / 'push' / 'OneSignalSDKWorker.js').write_text('importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");\n')
+    print(f"built site/ (draws 1-{meta['draws']}, latest {meta['last_date']}, {sum(not d['confirmed'] for d in latest['draws'])} provisional, alerts {'on' if push_app else 'off'}, cache {version}) and dist/artifact.html")
 
 
 if __name__ == '__main__':
